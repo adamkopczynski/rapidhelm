@@ -33,3 +33,12 @@ The Paris milestone adds Rust-owned course mapping/projection, pocket-expanded b
 The whitewater refinement replaces the default venue’s analytic U with an arc-length spline, rounded pool profiles and nine discrete grade drops. Rectangular baffles affect contacts, flow splitting and localized standing wakes. Course-grid ABI 5 adds turbulence/crest fields for foam; its stride is seven while the world-grid stride remains five. Gate suspension consumes a Rust surface-height upper envelope.
 
 ABI 6 adds a submerged flag to `venue_block`. Submerged shapers affect the water field but are excluded from planar hull contacts. Solid bank baffles render as joined modules inside one shared rectangular collision footprint. Fine foam/normal shading, spray and suspension sway are presentation effects; Rust still owns all large surface heights and gradients.
+
+
+The timed practice run lives in TypeScript and consumes authoritative world poses
+at every 120 Hz step through an optional runtime observer. In this mode, stepping
+uses single-tick calls so gate crossings cannot be lost between render frames;
+the unobserved sandbox retains batching. Rust still owns forces and contacts.
+Race rules are separately authored and Zod-validated. UI publishes race snapshots
+at the HUD cadence; character/paddle animation consumes controls without writing
+simulation state. See the gameplay-reference note for judging limitations.

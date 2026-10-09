@@ -19,6 +19,10 @@ import { createKayak } from './kayak';
 import { CreateLines } from '@babylonjs/core/Meshes/Builders/linesBuilder';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { createSimulation } from '@rapidhelm/wasm-bridge';
+import { practiceRules } from '../game/raceRules';
+import { createRace } from '../game/race';
+import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { CreateTorus } from '@babylonjs/core/Meshes/Builders/torusBuilder';
 import { createRuntime } from '../game/runtime';
 import { createKeyboardInput } from '../input/keyboard';
 import { createPaddler } from './paddler';
@@ -33,7 +37,11 @@ export function Viewport() {
     let cleanup = () => {};
     void createSimulation().then((sim) => {
       if (disposed || !canvas.current) return;
-      const runtime = createRuntime(sim, useSession.getState().config, initialVenue);
+      let race:ReturnType<typeof createRace>;
+      const runtime = createRuntime(sim, useSession.getState().config, initialVenue,(a,b,time,dt)=>race.step(a,b,time,dt,sim.channelFrame(b.x,b.z,true).z));
+      const raceGates=initialVenue.gates.map(g=>({...g,progress:g.z,...sim.channelFrame(g.x,g.z)}));
+      race=createRace(raceGates,initialVenue.bounds.maxZ-practiceRules.finishOffset);
+      useSession.setState({race:race.snapshot()});
       const engine = new Engine(canvas.current, true);
       const scene = new Scene(engine); scene.clearColor = new Color4(0.62, 0.78, 0.84, 1);
       const camera = new FreeCamera('chase', new Vector3(0, 7, -10), scene); camera.minZ = 0.1;
@@ -41,6 +49,9 @@ export function Viewport() {
       const sky=new HemisphericLight('sky', new Vector3(0.2, 1, 0.4), scene);sky.intensity=.55;
       const sun=new DirectionalLight('sun',new Vector3(.35,-.85,-.4),scene);sun.intensity=.75;
       const venueScene = createVenueScene(scene, sim, initialVenue);
+      const targetRing=CreateTorus('next gate target',{diameter:.85,thickness:.055,tessellation:32},scene);
+      targetRing.rotation.x=Math.PI/2;targetRing.billboardMode=Mesh.BILLBOARDMODE_ALL;
+      const targetMat=new StandardMaterial('target glow',scene);targetMat.disableLighting=true;targetRing.material=targetMat;
       const footprint=Array.from({length:61},(_,i)=>i*initialVenue.bounds.maxZ/60).flatMap(z=>[-1,1].map(side=>sim.channelFrame(sim.channelEdge(side,z)+side*5,z)));
       const minX=Math.min(...footprint.map(p=>p.x)),maxX=Math.max(...footprint.map(p=>p.x)),minZ=Math.min(...footprint.map(p=>p.z)),maxZ=Math.max(...footprint.map(p=>p.z));
       const overviewX=(minX+maxX)/2,overviewZ=(minZ+maxZ)/2;
@@ -57,7 +68,7 @@ export function Viewport() {
       const paddler=createPaddler(scene,boat);
       const input = createKeyboardInput(() => useSession.getState().restart(), () => { runtime.suspend(); resumeCamera = true; });
       let resumeCamera = false, hudTime = 0, frames = 0, simulationTotal = 0, renderTotal = 0, frameTotal = 0;
-      const resetCamera = () => { chase.update(runtime.read(), 0, true, sim.sampleWater(runtime.read().x, runtime.read().z, 0).height); hudTime = 0; frames = 0; simulationTotal = 0; renderTotal = 0; frameTotal = 0; useSession.setState({ diagnostics: emptyDiagnostics }); };
+      const resetCamera = () => { race.reset();useSession.setState({race:race.snapshot()});chase.update(runtime.read(), 0, true, sim.sampleWater(runtime.read().x, runtime.read().z, 0).height); hudTime = 0; frames = 0; simulationTotal = 0; renderTotal = 0; frameTotal = 0; useSession.setState({ diagnostics: emptyDiagnostics }); };
       const unsubscribe = useSession.subscribe((s, old) => {
         if (s.configRevision !== old.configRevision) {
           try { runtime.configure(s.config); input.clear(); resetCamera(); useSession.setState({ status: 'Simulation ready' }); }
@@ -82,6 +93,9 @@ export function Viewport() {
           camera.position.set(overviewX,height,overviewZ);camera.setTarget(new Vector3(overviewX,2.25,overviewZ));
           resumeCamera=true;
         } else {chase.update(s,delta,resumeCamera,water.height);resumeCamera=false;}
+        const raceState=race.snapshot(),next=raceGates.find(g=>g.id===raceState.nextId);
+        targetRing.setEnabled(Boolean(next)&&!useSession.getState().overview);
+        if(next) {targetRing.position.set(next.x,sim.waterCeiling(next.x,next.z)+2.6,next.z);targetMat.emissiveColor=next.direction==='upstream' ? new Color3(1,.3,.18):new Color3(.35,1,.55);}
         const debug = useSession.getState().debug;
         venueScene.update(frame.time, delta, debug,useSession.getState().overview);
         velocityLine.setEnabled(debug); headingLine.setEnabled(debug);
@@ -95,7 +109,8 @@ export function Viewport() {
         simulationTotal += frame.simulationMs; frameTotal += engine.getDeltaTime(); frames++; hudTime += delta;
         if (hudTime >= 0.1) {
           const a = frame.authoritative; const course=sim.channelFrame(a.x,a.z,true); const sin = Math.sin(a.yaw), cos = Math.cos(a.yaw);
-          useSession.setState({ diagnostics: { surfaceHeight:water.height,progress:course.z, courseFlow:water.velocityX*Math.sin(course.yaw)+water.velocityZ*Math.cos(course.yaw), forwardSpeed: a.velocityX * sin + a.velocityZ * cos, lateralSpeed: a.velocityX * cos - a.velocityZ * sin, yawRate: a.yawRate, heading: ((a.yaw * 180 / Math.PI) % 360 + 360) % 360, x: a.x, z: a.z, flowX: water.velocityX, flowZ: water.velocityZ, waveStrength: water.waveStrength, contacts: frame.contacts, steps: frame.stepsTotal, simulationMs: simulationTotal / frames, renderMs: renderTotal / frames, frameMs: frameTotal / frames } });
+          const bearing=next ? Math.atan2(Math.sin(Math.atan2(next.x-s.x,next.z-s.z)-s.yaw),Math.cos(Math.atan2(next.x-s.x,next.z-s.z)-s.yaw)) : 0;
+          useSession.setState({race:raceState,guidance:{bearing,distance:next ? Math.hypot(next.x-s.x,next.z-s.z):0}, diagnostics: { surfaceHeight:water.height,progress:course.z, courseFlow:water.velocityX*Math.sin(course.yaw)+water.velocityZ*Math.cos(course.yaw), forwardSpeed: a.velocityX * sin + a.velocityZ * cos, lateralSpeed: a.velocityX * cos - a.velocityZ * sin, yawRate: a.yawRate, heading: ((a.yaw * 180 / Math.PI) % 360 + 360) % 360, x: a.x, z: a.z, flowX: water.velocityX, flowZ: water.velocityZ, waveStrength: water.waveStrength, contacts: frame.contacts, steps: frame.stepsTotal, simulationMs: simulationTotal / frames, renderMs: renderTotal / frames, frameMs: frameTotal / frames } });
           hudTime = 0; frames = 0; simulationTotal = 0; renderTotal = 0; frameTotal = 0;
         }
       });

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "practice-slalom",
+  "touchPenalty": 2,
+  "missPenalty": 50,
+  "recoveryDistance": 14,
+  "finishOffset": 6
+}

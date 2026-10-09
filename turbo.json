@@ -37,6 +37,36 @@
       "dependsOn": [
         "^build"
       ]
+    },
+    "@rapidhelm/web#build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/content/**"
+      ]
+    },
+    "@rapidhelm/web#typecheck": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/content/**"
+      ]
+    },
+    "@rapidhelm/web#test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/content/**"
+      ]
     }
   }
 }

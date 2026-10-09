@@ -63,3 +63,6 @@ export const riverVenueSchema = z.object({
   for (const r of v.regions) if (r.x - r.radiusX < b.minX || r.x + r.radiusX > b.maxX || r.z - r.radiusZ < f.startZ + f.rampLength || r.z + r.radiusZ > b.maxZ) fail('Flow region outside the downstream channel');
 });
 export type RiverVenue = z.infer<typeof riverVenueSchema>;
+
+export const practiceRaceRulesSchema=z.object({version:z.literal(1),id:z.string().min(1),touchPenalty:z.number().finite().min(0).max(10),missPenalty:z.number().finite().min(10).max(100),recoveryDistance:z.number().finite().min(8).max(30),finishOffset:z.number().finite().min(2).max(20)});
+export type PracticeRaceRules=z.infer<typeof practiceRaceRulesSchema>;

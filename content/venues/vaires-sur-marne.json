@@ -320,7 +320,7 @@
   "gates": [
     {
       "id": 1,
-      "x": 1.8,
+      "x": 0,
       "z": 35,
       "width": 3,
       "direction": "downstream"

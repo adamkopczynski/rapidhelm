@@ -21,3 +21,10 @@ h1 { font-size: 25px; font-weight: 650; margin: 8px 0; } p { margin: 8px 0; }
 .hud {width:280px;padding:14px;} .hud h1 {font-size:20px;} .hud .speed {font-size:24px;}
 .hud .river-telemetry {display:none;} .hud:has(details[open]) .river-telemetry {display:grid;}
 .river-guide {max-width:300px;padding:10px 14px;}
+.race-hud {position:absolute;left:20px;top:20px;display:grid;gap:5px;padding:14px 18px;background:#101a23db;border:1px solid #ffffff25;border-radius:12px;min-width:230px;}
+.race-clock {font-size:36px;font-variant-numeric:tabular-nums;line-height:1.1;} .race-hud>span,.race-hud [role=status] {font-size:12px;} .race-hud button {padding:7px 12px;font-size:12px;}
+.hud {top:auto;bottom:18px;max-height:55vh;padding:10px 14px;}
+.gate-guidance {position:absolute;right:22px;top:22px;display:flex;align-items:center;gap:15px;background:#101a23db;padding:12px 18px;border-radius:12px;font-size:14px;}
+.direction-arrow {display:inline-block;font-size:36px;color:#b8ef69;} .gate-guidance small {display:block;margin-top:4px;color:#bdd0d4;font-size:11px;}
+.race-results {position:absolute;top:25%;left:50%;transform:translateX(-50%);padding:30px;background:#101a23ed;border:1px solid #b8ef6950;border-radius:16px;text-align:center;} .race-results>strong {font-size:42px;color:#b8ef69;font-variant-numeric:tabular-nums;}
+.venue-overview .hud {display:none;} @media(max-width:700px){.race-hud{left:8px;top:8px;min-width:180px;padding:10px;}.gate-guidance{right:8px;top:8px;max-width:180px;padding:8px;gap:8px;font-size:11px;}.race-clock{font-size:28px;}.hud{left:8px;bottom:8px;top:auto;}}

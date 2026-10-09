@@ -5,7 +5,7 @@ export function interpolate({ previous: a, current: b }: Snapshots, alpha: numbe
   const mix = (x: number, y: number) => x + (y - x) * alpha;
   return { x: mix(a.x, b.x), z: mix(a.z, b.z), yaw: mix(a.yaw, b.yaw), velocityX: mix(a.velocityX, b.velocityX), velocityZ: mix(a.velocityZ, b.velocityZ), yawRate: mix(a.yawRate, b.yawRate) };
 }
-export function createRuntime(sim: Simulation, config: SimulationConfig, venue?: VenueConfig) {
+export function createRuntime(sim: Simulation, config: SimulationConfig, venue?: VenueConfig, onStep?: (before:BoatState,after:BoatState,time:number,dt:number)=>void) {
   sim.configure(config);
   if (venue) sim.configureVenue(venue);
   let snapshots = sim.read(), accumulator = 0, stepsTotal = 0;
@@ -18,7 +18,12 @@ export function createRuntime(sim: Simulation, config: SimulationConfig, venue?:
     update: (delta: number, input: Controls) => {
       const tick = consumeTime(accumulator, delta, sim.timestep); accumulator = tick.remainder;
       const start = performance.now();
-      if (tick.steps > 0) snapshots = sim.advance(tick.steps, input.throttle, input.steering);
+      if (tick.steps > 0) {
+        if(onStep) for(let i=0;i<tick.steps;i++) {
+          const before=snapshots.current;snapshots=sim.advance(1,input.throttle,input.steering);
+          onStep(before,snapshots.current,sim.time(),sim.timestep);
+        } else snapshots=sim.advance(tick.steps,input.throttle,input.steering);
+      }
       const simulationMs = performance.now() - start;
       stepsTotal += tick.steps;
       const time = Math.max(0, sim.time() - sim.timestep + accumulator);
