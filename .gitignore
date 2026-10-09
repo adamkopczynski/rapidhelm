@@ -1,0 +1,10 @@
+node_modules/
+dist/
+target/
+.turbo/
+playwright-report/
+test-results/
+.DS_Store
+*.local
+
+.pnpm-store/
