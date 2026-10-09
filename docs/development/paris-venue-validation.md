@@ -1,26 +1,30 @@
 # Paris venue validation — 9 October 2026
 
+This note describes the whitewater refinement after the initial Paris milestone. The original equal-legged U, travelling waves and circular baffles have been replaced in the default venue; the straight training fixture remains intact.
+
 ## Automated verification
 
-- `pnpm check`: TypeScript, 16 Vitest tests (including actual compiled-WASM Paris checks), 20 native Rust tests and production build.
-- `cargo fmt` and `cargo clippy -- -D warnings` through the repository Cargo launcher.
-- The 150-second scripted centreline controller reaches the return leg beyond 240 m. Every tick checks the sampled capsule spine against both bank edges and the end caps, plus exact capsule/circle baffle clearance. Old straight-course regressions continue passing.
-- Mapping and flow tests cover the bend, both straight legs, six reverse eddies, atomic invalid geometry rejection, pocket-aware batched water and the 4.5 m base drop. Native surface gradients are checked by world-space finite differences.
+- `pnpm check`: TypeScript checks, 17 Vitest tests, 22 native Rust tests and production build. Cargo formatting and `cargo clippy -- -D warnings` pass through the repository launcher.
+- Actual compiled-WASM tests validate the revised content and its 300 m spline, check six upstream eddies, compare seven-field course-grid samples with world-space scalar samples, and reject invalid staged geometry/drop parameters atomically.
+- A 150-second scripted centreline controller reaches the return leg beyond 240 m. Every tick checks the sampled capsule against expanded banks and end caps, plus oriented rectangular block clearance using 33 spine probes. It is a test input source, not an in-game steering assist.
+- Native tests check spline offset/progress roundtrips and folded-route rejection. Rectangular contacts cover faces/corners at 32 hull headings and a 1,000 m/s stress approach without tunnelling. Existing straight-bank, circular-obstacle and baseline boat regressions pass.
+- Whitewater tests check high/low flat pools, nine-drop total elevation change, fixed crest locations across time, quiet water between features, world-space finite-difference surface gradients and gate-pole clearance across multiple animation phases. Pole clearance uses the same Rust upper envelope consumed by rendering.
 
-## Interactive browser checks
+## Interactive verification
 
-The live development app was inspected in the Codex in-app browser with native keyboard/UI actions. Chrome native access was unavailable in the preceding session, so these results should not be described as a test in the user's Chrome window.
+The rebuilt development app was inspected in the Codex in-app browser using native keyboard/UI actions. This is not a test in the user's Chrome window. E2E/Playwright tests and its profiler remain paused.
 
-- Loaded the rebuilt WASM successfully; the HUD reports Simulation ready.
-- Inspected the U-shaped channel from Venue overview, including alternating expanded pockets, modular baffles and surrounding facility/terrace/lake proxies.
-- Held W for ten seconds from the calm pool; reached 53.9 m, with 0.30 m wave amplitude and sampled downstream flow. Inspected numbered red/green hanging gates and baffles in chase view.
-- No captured browser console errors at that checkpoint. Later HUD hot updates exposed an existing duplicate React root warning: the app component was separated from the root entry point to give Vite a proper component refresh boundary. The final fresh load reached Simulation ready without a new console error; earlier warnings remained in the browser log history.
-- Concrete construction was changed after visual inspection from wave-phase-aligned boxes to continuous strips on the Rust base grade. Follow-up inspection confirmed continuous lit banks, compact overview/chase switching, debug vectors, another paddle into rapids and reset to 5.0 m with zero flow/waves/contacts.
+- Startup reached Simulation ready with the new WASM ABI.
+- Overview inspection confirmed an asymmetric horseshoe, rounded wider head/receiving pools, blue rectangular baffles, alternating side pockets and localized whitewater. The camera fits the full channel footprint. Surrounding facilities remain simple proxies; an overlapping building proxy was moved clear of the receiving pool.
+- Chase view: holding W for twelve seconds reached 61.6 m, past the first localized drop. The boat contacted a blue block and subsequently drifted clear. The contact counter counts simulation ticks with contact, not distinct impacts.
+- Visible gate poles use narrow red/green and white rings, hanging cords and pole tips above the water. The first crest/drops have local foam; quiet stretches and pools lack the previous periodic ocean-wave pattern.
+- No browser console errors were captured during that gameplay checkpoint.
+- Water-elevation telemetry exposes the current height relative to the 0 m finish pool. Reset returns to the +4.5 m starting pool while clearing contacts and current/crest diagnostics.
 
-These are rendering/input smoke checks, not acceptance of realistic handling. A human should test entering/leaving all eddies, upstream gate approach, the bend under different momentum, obstacle recovery and several boat tunings. No target-GPU benchmark or complete human-driven course run is claimed. Existing production chunk-size/dependency-comment warnings remain non-blocking.
+These are input/rendering smoke checks. A human should still assess paddling feel, upstream gate approach, entering/leaving every eddy, block recovery and bend handling at several tunings. No full human-driven race or target-GPU performance benchmark is claimed. Existing bundle-size and dependency-comment build warnings remain non-blocking.
 
-## Deliberate limits
+## Limits and provenance
 
-The geometry follows the supplied references approximately. The site is not georeferenced; neither obstacle/gate arrangement nor the hydraulic field reproduces the official competition configuration. Training and regatta lengths/discharges are metadata references; only the competition channel is playable. See [model assumptions and source provenance](../physics/paris-venue.md).
+The spline is an estimate from Paris aerial photographs and the architectural site plan, not a survey or the official race gate/block layout. The first new panoramic photo appears to depict a different venue and was used for baffle/whitewater appearance rather than the Paris outline. Nominal width is intentionally increased to 16 m for handling iteration. Training and regatta dimensions are metadata; only the competition channel is playable.
 
-E2E/Playwright tests and its profiler remain paused by user instruction. Generated WASM and build outputs are ignored and are not committed.
+The hydraulics remain parameterized local fields, not a mass-conserving hydraulic solver. See [model assumptions, gate dimensions and sources](../physics/paris-venue.md). Generated WASM and build outputs are ignored and are not committed.

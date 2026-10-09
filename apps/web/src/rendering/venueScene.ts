@@ -15,7 +15,7 @@ import '@babylonjs/core/Meshes/thinInstanceMesh';
 import type { Scene } from '@babylonjs/core/scene';
 import type { Simulation } from '@rapidhelm/wasm-bridge';
 import type { RiverVenue } from '@rapidhelm/content-schema';
-const NX = 17, NZ = 221;
+const NX = 13, NZ = 301;
 export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenue) {
   const b = venue.bounds, width = b.maxX - b.minX, length = b.maxZ - b.minZ;
   const frame=(x:number,z:number)=>sim.channelFrame(x,z);
@@ -49,10 +49,22 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
     mesh.material=path ? walkway:concrete;mesh.material.backFaceCulling=false;
   }
   for(const side of [-1,1]) {bankStrip(side,false);bankStrip(side,true);}
-  for (const z of [b.minZ, b.maxZ]) {
-    const wall = CreateBox('end boundary', { width: width + 2, height: 2.8, depth: 1 }, scene); place(wall,0,z+(z===b.minZ ? -0.5 : 0.5),height(0,z)-0.4); wall.material = concrete;
+  if(venue.geometry?.centerline) {
+    const positions:number[]=[30,2.5,50],indices:number[]=[],normals:number[]=[];
+    for(let i=0;i<=100;i++) {
+      const z=length*i/100, f=frame(sim.channelEdge(-1,z)-5,z);
+      positions.push(f.x,sim.baseHeight(z)+0.8,f.z);
+      if(i>0) indices.push(0,i,i+1);
+    }
+    indices.push(0,101,1);VertexData.ComputeNormals(positions,indices,normals);
+    const island=new Mesh('graded central island',scene),data=new VertexData();
+    data.positions=positions;data.indices=indices;data.normals=normals;data.applyToMesh(island);
+    island.material=grass;grass.backFaceCulling=false;
   }
-  const startLine = CreateBox('start pool stripe', { width: width - 0.5, height: 0.025, depth: 0.2 }, scene); place(startLine,0,venue.start.z-2.2,0.015); startLine.material = startMat;
+  for (const z of [b.minZ, b.maxZ]) {
+    const wall = CreateBox('end boundary', { width: sim.channelEdge(1,z)-sim.channelEdge(-1,z)+2, height: 2.8, depth: 1 }, scene); place(wall,0,z+(z===b.minZ ? -0.5 : 0.5),height(0,z)-0.4); wall.material = concrete;
+  }
+  const startLine = CreateBox('start pool stripe', { width: width - 0.5, height: 0.025, depth: 0.2 }, scene); place(startLine,0,venue.start.z-2.2,sim.baseHeight(venue.start.z)+0.015); startLine.material = startMat;
   function label(text: string, x: number, z: number, color: string) {
     const texture = new DynamicTexture(text, { width: 512, height: 128 }, scene, false);
     texture.drawText(text, null, 85, 'bold 44px sans-serif', color, '#162c32', true);
@@ -61,46 +73,67 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
   }
   label('START POOL', b.minX + 1, venue.start.z + 1, '#c8f078');
   label('CATCH THE FLOW', b.maxX + 2, venue.flow.startZ + venue.flow.rampLength, '#b7edf3');
-  for (const r of venue.regions) label('UPSTREAM EDDY', r.x < 0 ? b.minX - 2 : b.maxX + 2, r.z, '#c5c4ff');
-  label('CHANNEL END', b.minX - 2, b.maxZ - 5, '#b7edf3');
-  const baffleMat=material('modular baffle shell',new Color3(0.68,0.73,0.72));
+  for (const r of venue.regions.filter(r=>r.velocityZ<0)) label('UPSTREAM EDDY', r.x < 0 ? b.minX - 2 : b.maxX + 2, r.z, '#c5c4ff');
+  label('FINISH POOL', b.minX - 2, b.maxZ - 5, '#b7edf3');
+  const baffleMat=material('blue modular baffle',new Color3(0.035,0.43,0.79));
+  const baffleTop=material('baffle blue cap',new Color3(0.09,0.57,0.87));
   for (const o of venue.obstacles) {
     const y=height(o.x,o.z);
-    const block=CreateCylinder(o.id,{diameter:o.radius*2,height:1.7,tessellation:12},scene);
-    place(block,o.x,o.z,y+0.15);block.material=baffleMat;
-    const cap=CreateBox('baffle insert',{width:o.radius*1.3,depth:o.radius*1.3,height:0.12},scene);
-    place(cap,o.x,o.z,y+1.06);cap.material=rockMat;
+    const block=o.width ? CreateBox(o.id,{width:o.width,depth:o.length,height:1.35},scene) : CreateCylinder(o.id,{diameter:o.radius*2,height:1.35,tessellation:12},scene);
+    place(block,o.x,o.z,y+0.1);block.rotation.y+=o.yaw??0;block.material=baffleMat;
+    const cap=CreateBox('baffle cap',{width:o.width??o.radius*1.3,depth:o.length??o.radius*1.3,height:0.08},scene);
+    place(cap,o.x,o.z,y+0.815);cap.rotation.y+=o.yaw??0;cap.material=baffleTop;
+    if(o.width) for(let rib=0;rib<Math.floor(o.width/0.4);rib++) {
+      const slot=CreateBox('baffle moulding',{width:0.04,height:0.85,depth:0.02},scene);slot.parent=block;slot.position.set(-o.width/2+0.3+rib*0.4,0, -(o.length??1)/2-0.012);slot.material=rockMat;
+    }
     const rail=CreateBox('submerged mounting rail',{width:0.12,depth:4,height:0.06},scene);
     place(rail,o.x,o.z,y-0.45);rail.material=rockMat;
   }
   const white=material('white gate bands',Color3.White());
   const red=material('upstream gate',new Color3(0.88,0.16,0.12));
   const green=material('downstream gate',new Color3(0.04,0.55,0.28));
+  const gateDiameter=0.045, poleLength=1.8, clearance=0.2;
   for (const gate of venue.gates) {
-    const y=height(gate.x,gate.z);
-    for (const side of [-1,1]) for (let band=0;band<6;band++) {
-      const pole=CreateCylinder('gate '+gate.id,{diameter:0.09,height:0.48,tessellation:8},scene);
-      place(pole,gate.x+side*gate.width/2,gate.z,y+0.25+band*0.48);
-      pole.material=band%2===0 ? (gate.direction==='upstream' ? red : green):white;
+    const supports:{x:number;bottom:number}[]=[];
+    for (const side of [-1,1]) {
+      // Authored width measures the gap between inside edges, not pole centres.
+      const x=gate.x+side*(gate.width+gateDiameter)/2;
+      const f=frame(x,gate.z),bottom=sim.waterCeiling(f.x,f.z)+clearance;
+      supports.push({x,bottom});
+      for (let band=0;band<9;band++) {
+        const pole=CreateCylinder('gate '+gate.id,{diameter:gateDiameter,height:0.2,tessellation:8},scene);
+        place(pole,x,gate.z,bottom+0.1+band*0.2);
+        pole.material=band%2===0 ? white:(gate.direction==='upstream' ? red:green);
+      }
+      const tip=CreateCylinder('black gate tip',{diameter:gateDiameter+0.001,height:0.022,tessellation:8},scene);
+      place(tip,x,gate.z,bottom+0.011);tip.material=rockMat;
     }
-    const cable=CreateBox('gate suspension',{width:width+8,height:0.025,depth:0.025},scene);
-    place(cable,0,gate.z,y+3.4);cable.material=rockMat;
+    const cableHeight=Math.max(...supports.map(p=>p.bottom))+poleLength+0.4;
+    const left=sim.channelEdge(-1,gate.z)-3,right=sim.channelEdge(1,gate.z)+3;
+    const cable=CreateBox('gate suspension',{width:right-left,height:0.015,depth:0.015},scene);
+    place(cable,(left+right)/2,gate.z,cableHeight);cable.material=rockMat;
+    for(const p of supports) {
+      const length=cableHeight-p.bottom-poleLength;
+      const cord=CreateCylinder('individual gate cord',{diameter:0.008,height:length,tessellation:4},scene);
+      place(cord,p.x,gate.z,p.bottom+poleLength+length/2);cord.material=rockMat;
+    }
     const texture=new DynamicTexture('gate number '+gate.id,{width:128,height:128},scene,false);
     texture.drawText(String(gate.id),null,90,'bold 76px sans-serif','#162c32','#f0f3e9',true);
-    const number=CreatePlane('gate number '+gate.id,{width:0.65,height:0.65},scene);
-    place(number,gate.x,gate.z,y+3.25);number.billboardMode=Mesh.BILLBOARDMODE_Y;
+    const number=CreatePlane('gate number '+gate.id,{width:0.3,height:0.3},scene);
+    place(number,gate.x,gate.z,cableHeight-0.2);number.billboardMode=Mesh.BILLBOARDMODE_Y;
     const mat=material('number',Color3.White());mat.diffuseTexture=texture;number.material=mat;
   }
   if (venue.geometry) {
     const lake=CreateBox('regatta lake context',{width:85,depth:240,height:0.05},scene);
-    lake.position.set(-68,-5.2,65);lake.material=material('flatwater',new Color3(0.12,0.36,0.44));
-    const building=CreateBox('venue facilities proxy',{width:16,depth:75,height:4},scene);
-    building.position.set(-25,-1,52);building.material=concrete;
+    lake.position.set(-68,0,35);lake.material=material('flatwater',new Color3(0.12,0.36,0.44));
+    const building=CreateBox('venue facilities proxy',{width:24,depth:14,height:4},scene);
+    building.position.set(32,2,-30);building.material=concrete;
     for (let tier=0;tier<5;tier++) {
       const stand=CreateBox('spectator terrace',{width:3,depth:70,height:0.5},scene);
-      stand.position.set(76+tier*3,-2+tier*0.6,55);stand.material=walkway;
+      stand.position.set(-35-tier*3,1+tier*0.6,50);stand.material=walkway;
     }
     label('VAIRES-SUR-MARNE',-16,10,'#e5f4ee');
+    for(const [text,z] of [['HIGH START · +4.5 m',8],['LOW FINISH · 0 m',293]] as const) label(text,0,z,'#e5f4ee');
   }
   const count = NX * NZ, positions = new Float32Array(count * 3), normals = new Float32Array(count * 3), colors = new Float32Array(count * 4), indices: number[] = [];
   for (let row = 0; row < NZ; row++) for (let col = 0; col < NX; col++) {
@@ -115,17 +148,17 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
     const left=sim.channelEdge(-1,z), right=sim.channelEdge(1,z);
     const gx = Math.max(0, Math.min(NX - 1.00001, (x - left)/(right-left)*(NX-1))), gz = Math.max(0, Math.min(NZ - 1.00001, (z - b.minZ) / dz));
     const col = Math.floor(gx), row = Math.floor(gz), tx = gx - col, tz = gz - row;
-    const i = (row * NX + col) * 5 + field;
-    const a = grid[i] * (1 - tx) + grid[i + 5] * tx, c = grid[i + NX * 5] * (1 - tx) + grid[i + (NX + 1) * 5] * tx;
+    const i = (row * NX + col) * 7 + field;
+    const a = grid[i] * (1 - tx) + grid[i + 7] * tx, c = grid[i + NX * 7] * (1 - tx) + grid[i + (NX + 1) * 7] * tx;
     return a * (1 - tz) + c * tz;
   }
   const foam = CreateDisc('flow foam', { radius: 0.5, tessellation: 8 }, scene); foam.bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2));
   const foamMat = material('foam', new Color3(0.8, 0.93, 0.9)); foamMat.emissiveColor = new Color3(0.25, 0.3, 0.3); foamMat.alpha = 0.7; foam.material = foamMat;
-  const foamCount = 230, matrices = new Float32Array(foamCount * 16);
+  const foamCount = 700, matrices = new Float32Array(foamCount * 16);
   const flakes = Array.from({ length: foamCount }, (_, i) => ({ x: b.minX + 0.8 + ((i * 0.61803398875) % 1) * (width - 1.6), z: venue.flow.startZ + ((i * 0.381966) % 1) * (b.maxZ - venue.flow.startZ - 1) }));
   const scale = new Vector3(), rotation = new Quaternion(), position = new Vector3(), matrix = new Matrix();
   foam.thinInstanceSetBuffer('matrix', matrices, 16, false);
-  foam.setBoundingInfo(new BoundingInfo(new Vector3(-20,-10,-5),new Vector3(100,5,180)));
+  foam.setBoundingInfo(new BoundingInfo(new Vector3(-20,-10,-5),new Vector3(110,10,180)));
   const arrows: { x: number; z: number; points: Vector3[]; mesh: ReturnType<typeof CreateLines> }[] = [];
   for (let z = venue.flow.startZ + 8; z < b.maxZ - 3; z += 14) for (const x of [-5, 0, 5]) {
     if (x <= b.minX + 1 || x >= b.maxX - 1) continue;
@@ -139,9 +172,11 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
       if (time - lastTime >= 1 / 30 || time < lastTime || lastTime < 0) {
         grid = sim.courseGrid(NX, NZ, b.minX, b.minZ, dx, dz, time); lastTime = time;
         for (let i = 0; i < count; i++) {
-          positions[i * 3 + 1] = grid[i * 5]; const gx = grid[i * 5 + 3], gz = grid[i * 5 + 4], inv = 1 / Math.hypot(gx, 1, gz);
+          positions[i * 3 + 1] = grid[i * 7]; const gx = grid[i * 7 + 3], gz = grid[i * 7 + 4], inv = 1 / Math.hypot(gx, 1, gz);
           normals[i * 3] = -gx * inv; normals[i * 3 + 1] = inv; normals[i * 3 + 2] = -gz * inv;
-          const whiteness = Math.min(0.5, Math.abs(gz) * 1.4 + Math.abs(gx) * 0.35);
+          const turbulence=grid[i*7+5], crest=grid[i*7+6];
+          const fleck=0.7+0.3*Math.sin(positions[i*3]*3.7+positions[i*3+2]*2.3-time*4);
+          const whiteness = Math.min(0.82,turbulence*0.62+crest*1.6)*fleck;
           colors[i * 4] = 0.13 + whiteness; colors[i * 4 + 1] = 0.32 + whiteness * 0.7; colors[i * 4 + 2] = 0.3 + whiteness * 0.6;
         }
         water.updateVerticesData(VertexBuffer.PositionKind, positions); water.updateVerticesData(VertexBuffer.NormalKind, normals); water.updateVerticesData(VertexBuffer.ColorKind, colors);
@@ -150,11 +185,15 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
         const f = flakes[i]; const vx = gridValue(f.x, f.z, 1), vz = gridValue(f.x, f.z, 2);
         const mapped=frame(f.x,f.z), sin=Math.sin(mapped.yaw), cos=Math.cos(mapped.yaw);
         f.x += (vx*cos-vz*sin)*delta;
-        const metric=venue.geometry && mapped.yaw>0 && mapped.yaw<Math.PI ? 1-f.x/venue.geometry.bendRadius : 1;
+        const metric=sim.channelMetric(f.x,f.z);
         f.z += (vx*sin+vz*cos)*delta/metric;
         if (f.x < sim.channelEdge(-1,f.z)+0.4 || f.x > sim.channelEdge(1,f.z)-0.4 || f.z > b.maxZ - 0.5 || f.z < venue.flow.startZ) { f.x = b.minX + 0.8 + ((i * 0.61803398875) % 1) * (width - 1.6); f.z = venue.flow.startZ + 2; }
-        const hidden = venue.obstacles.some((o) => Math.hypot(f.x - o.x, f.z - o.z) < o.radius);
-        scale.set(hidden ? 0 : 0.1, 1, 0.25 + Math.hypot(vx, vz) * 0.14);
+        const hidden = venue.obstacles.some((o) => {if(!o.width) return Math.hypot(f.x-o.x,f.z-o.z)<o.radius;
+          const angle=o.yaw??0,dx=f.x-o.x,dz=f.z-o.z;
+          return Math.abs(dx*Math.cos(angle)-dz*Math.sin(angle))<o.width/2+0.15 && Math.abs(dx*Math.sin(angle)+dz*Math.cos(angle))<(o.length??0)/2+0.15;
+        });
+        const turbulent=gridValue(f.x,f.z,5), size=0.06+turbulent*0.32;
+        scale.set(hidden ? 0 : size, 1, size*(1.2+Math.hypot(vx,vz)*0.45));
         Quaternion.FromEulerAnglesToRef(0, Math.atan2(vx, vz), 0, rotation);
         const world=frame(f.x,f.z);position.set(world.x, gridValue(f.x, f.z, 0) + 0.04, world.z); Matrix.ComposeToRef(scale, rotation, position, matrix); matrix.copyToArray(matrices, i * 16);
       }

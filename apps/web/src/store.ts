@@ -2,12 +2,12 @@ import { create } from 'zustand';
 import type { BoatConfig } from '@rapidhelm/content-schema';
 import { baseline } from './game/config';
 export interface Diagnostics {
-  progress:number; courseFlow:number;
+  surfaceHeight:number; progress:number; courseFlow:number;
   forwardSpeed: number; lateralSpeed: number; yawRate: number; heading: number; x: number; z: number;
   flowX: number; flowZ: number; waveStrength: number; contacts: number;
   steps: number; simulationMs: number; renderMs: number; frameMs: number;
 }
-export const emptyDiagnostics: Diagnostics = { progress:5,courseFlow:0,forwardSpeed: 0, lateralSpeed: 0, yawRate: 0, heading: 0, x: 0, z: 5, flowX: 0, flowZ: 0, waveStrength: 0, contacts: 0, steps: 0, simulationMs: 0, renderMs: 0, frameMs: 0 };
+export const emptyDiagnostics: Diagnostics = { surfaceHeight:4.5,progress:5,courseFlow:0,forwardSpeed: 0, lateralSpeed: 0, yawRate: 0, heading: 0, x: 0, z: 5, flowX: 0, flowZ: 0, waveStrength: 0, contacts: 0, steps: 0, simulationMs: 0, renderMs: 0, frameMs: 0 };
 interface Session {
   status: string; diagnostics: Diagnostics; config: BoatConfig; configRevision: number; resetId: number; debug: boolean; overview:boolean;
   setOverview(value:boolean):void;

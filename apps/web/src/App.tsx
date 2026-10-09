@@ -5,7 +5,7 @@ import { TuningPanel } from './ui/TuningPanel';
 import { initialVenue as venue } from './game/venue';
 export function App() {
   const { status, diagnostics: d, restart, debug, setDebug, overview, setOverview } = useSession();
-  const zone = d.progress < venue.flow.startZ ? 'START POOL' : d.progress < venue.flow.startZ+venue.flow.rampLength ? 'CATCHING THE FLOW' : d.courseFlow < -0.2 ? 'UPSTREAM CURRENT' : d.progress > venue.bounds.maxZ-8 ? 'CHANNEL END' : 'DOWNSTREAM RAPIDS';
+  const zone = d.progress < venue.flow.startZ ? 'START POOL' : d.progress < venue.flow.startZ+venue.flow.rampLength ? 'CATCHING THE FLOW' : d.courseFlow < -0.2 ? 'UPSTREAM CURRENT' : d.progress >= venue.bounds.maxZ-(venue.geometry?.pools?.length??8) ? 'FINISH POOL' : 'DOWNSTREAM RAPIDS';
   return <main className={overview ? 'venue-overview' : undefined}>
     <Viewport />
     <section className="hud" aria-label="River controls">
@@ -17,7 +17,8 @@ export function App() {
       <dl className="telemetry river-telemetry">
         <div><dt>Course progress</dt><dd>{d.progress.toFixed(1)} / {venue.bounds.maxZ} m</dd></div>
         <div><dt>Local flow X / Z</dt><dd>{d.flowX.toFixed(2)} / {d.flowZ.toFixed(2)} m/s</dd></div>
-        <div><dt>Wave amplitude</dt><dd>{d.waveStrength.toFixed(2)} m</dd></div>
+        <div><dt>Water elevation</dt><dd>{d.surfaceHeight.toFixed(2)} m · finish 0 m</dd></div>
+        <div><dt>Standing crest</dt><dd>{d.waveStrength.toFixed(2)} m</dd></div>
         <div><dt>Hull contacts</dt><dd>{d.contacts}</dd></div>
       </dl>
       <Button onClick={()=>setOverview(!overview)}>{overview ? 'Chase camera' : 'Venue overview'}</Button>
@@ -43,6 +44,6 @@ export function App() {
       <TuningPanel />
       <p className="note">Approximate venue geometry and authored flow. Gates are practice targets; judging is pending.</p>
     </section>
-    <aside className="river-guide"><strong>{zone}</strong><span>{d.progress < venue.flow.startZ+venue.flow.rampLength ? 'Hold W to paddle into the downstream flow. A / D steer; S brakes.' : 'Use momentum to pass the rocks. Eddy water can carry you upstream.'}</span><span>{venue.gates.length} practice gates · {venue.gates.filter(g=>g.direction==='upstream').length} upstream targets · U-shaped competition channel</span></aside>
+    <aside className="river-guide"><strong>{zone}</strong><span>{d.progress < venue.flow.startZ+venue.flow.rampLength ? 'Hold W to paddle into the downstream flow. A / D steer; S brakes.' : 'Use momentum to pass the rocks. Eddy water can carry you upstream.'}</span><span>{venue.gates.length} practice gates · {venue.gates.filter(g=>g.direction==='upstream').length} upstream targets · Asymmetric course · high start → low finish</span></aside>
   </main>;
 }

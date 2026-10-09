@@ -38,6 +38,9 @@ export function Viewport() {
       const chase = createChaseCamera(camera); chase.update(runtime.read(), 0, true);
       new HemisphericLight('sky', new Vector3(0.2, 1, 0.4), scene);
       const venueScene = createVenueScene(scene, sim, initialVenue);
+      const footprint=Array.from({length:61},(_,i)=>i*initialVenue.bounds.maxZ/60).flatMap(z=>[-1,1].map(side=>sim.channelFrame(sim.channelEdge(side,z)+side*5,z)));
+      const minX=Math.min(...footprint.map(p=>p.x)),maxX=Math.max(...footprint.map(p=>p.x)),minZ=Math.min(...footprint.map(p=>p.z)),maxZ=Math.max(...footprint.map(p=>p.z));
+      const overviewX=(minX+maxX)/2,overviewZ=(minZ+maxZ)/2;
       const markerMat = new StandardMaterial('markers', scene); markerMat.diffuseColor = new Color3(0.2, 0.25, 0.27);
       const boat = new TransformNode('boat-state', scene);
       const hull = CreateCapsule('kayak', { radius: 0.42, height: 3.8 }, scene); hull.parent = boat; hull.rotation.x = Math.PI / 2; hull.scaling.z = 0.55;
@@ -69,7 +72,9 @@ export function Viewport() {
         boat.position.set(s.x, water.height + 0.22, s.z);
         boat.rotation.set(-Math.atan(water.gradientX * Math.sin(s.yaw) + water.gradientZ * Math.cos(s.yaw)), s.yaw, Math.atan(water.gradientX * Math.cos(s.yaw) - water.gradientZ * Math.sin(s.yaw)));
         if (useSession.getState().overview) {
-          camera.position.set(30,200,65);camera.setTarget(new Vector3(30,-2,65));
+          const span=Math.max(maxZ-minZ,(maxX-minX)/engine.getAspectRatio(camera));
+          const height=(span+20)/(2*Math.tan(camera.fov/2))+initialVenue.metadata!.drop;
+          camera.position.set(overviewX,height,overviewZ);camera.setTarget(new Vector3(overviewX,2.25,overviewZ));
           resumeCamera=true;
         } else {chase.update(s,delta,resumeCamera,water.height);resumeCamera=false;}
         const debug = useSession.getState().debug;
@@ -85,7 +90,7 @@ export function Viewport() {
         simulationTotal += frame.simulationMs; frameTotal += engine.getDeltaTime(); frames++; hudTime += delta;
         if (hudTime >= 0.1) {
           const a = frame.authoritative; const course=sim.channelFrame(a.x,a.z,true); const sin = Math.sin(a.yaw), cos = Math.cos(a.yaw);
-          useSession.setState({ diagnostics: { progress:course.z, courseFlow:water.velocityX*Math.sin(course.yaw)+water.velocityZ*Math.cos(course.yaw), forwardSpeed: a.velocityX * sin + a.velocityZ * cos, lateralSpeed: a.velocityX * cos - a.velocityZ * sin, yawRate: a.yawRate, heading: ((a.yaw * 180 / Math.PI) % 360 + 360) % 360, x: a.x, z: a.z, flowX: water.velocityX, flowZ: water.velocityZ, waveStrength: water.waveStrength, contacts: frame.contacts, steps: frame.stepsTotal, simulationMs: simulationTotal / frames, renderMs: renderTotal / frames, frameMs: frameTotal / frames } });
+          useSession.setState({ diagnostics: { surfaceHeight:water.height,progress:course.z, courseFlow:water.velocityX*Math.sin(course.yaw)+water.velocityZ*Math.cos(course.yaw), forwardSpeed: a.velocityX * sin + a.velocityZ * cos, lateralSpeed: a.velocityX * cos - a.velocityZ * sin, yawRate: a.yawRate, heading: ((a.yaw * 180 / Math.PI) % 360 + 360) % 360, x: a.x, z: a.z, flowX: water.velocityX, flowZ: water.velocityZ, waveStrength: water.waveStrength, contacts: frame.contacts, steps: frame.stepsTotal, simulationMs: simulationTotal / frames, renderMs: renderTotal / frames, frameMs: frameTotal / frames } });
           hudTime = 0; frames = 0; simulationTotal = 0; renderTotal = 0; frameTotal = 0;
         }
       });
