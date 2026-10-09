@@ -16,7 +16,7 @@ test('race camera stays behind the hull across heading wrap and anticipates velo
   const state={x:12,z:40,yaw:Math.PI-.001,velocityX:0,velocityZ:-3,yawRate:0};
   chase.update(state,0,true,2);
   const before=camera.position.clone();
-  expect(camera.position.y).toBeCloseTo(4.8);
+  expect(camera.position.y).toBeCloseTo(4.15);
   expect(camera.position.z).toBeGreaterThan(state.z);
   expect(target.z).toBeLessThan(state.z-7);
   chase.update({...state,yaw:-Math.PI+.001},1/60,false,2);

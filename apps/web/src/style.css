@@ -16,3 +16,8 @@ h1 { font-size: 25px; font-weight: 650; margin: 8px 0; } p { margin: 8px 0; }
 
 .venue-overview .hud { width: 250px; padding: 12px; }
 .venue-overview .hud .speed, .venue-overview .hud .telemetry, .venue-overview .hud .controls, .venue-overview .hud .debug-toggle, .venue-overview .hud .legend, .venue-overview .hud details, .venue-overview .hud .note { display: none; }
+
+/* Keep the course visible; instrumentation remains available in an expandable panel. */
+.hud {width:280px;padding:14px;} .hud h1 {font-size:20px;} .hud .speed {font-size:24px;}
+.hud .river-telemetry {display:none;} .hud:has(details[open]) .river-telemetry {display:grid;}
+.river-guide {max-width:300px;padding:10px 14px;}

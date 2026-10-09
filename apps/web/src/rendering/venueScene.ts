@@ -68,10 +68,11 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
     const wall = CreateBox('end boundary', { width: sim.channelEdge(1,z)-sim.channelEdge(-1,z)+2, height: 2.8, depth: 1 }, scene); place(wall,0,z+(z===b.minZ ? -0.5 : 0.5),height(0,z)-0.4); wall.material = concrete;
   }
   const startLine = CreateBox('start pool stripe', { width: width - 0.5, height: 0.025, depth: 0.2 }, scene); place(startLine,0,venue.start.z-2.2,sim.baseHeight(venue.start.z)+0.015); startLine.material = startMat;
+  const venueSigns:Mesh[]=[];
   function label(text: string, x: number, z: number, color: string) {
     const texture = new DynamicTexture(text, { width: 512, height: 128 }, scene, false);
     texture.drawText(text, null, 85, 'bold 44px sans-serif', color, '#162c32', true);
-    const sign = CreatePlane(text, { width: 4, height: 1 }, scene); place(sign,x,z,height(x,z)+2.2); sign.billboardMode = Mesh.BILLBOARDMODE_Y;
+    const sign = CreatePlane(text, { width: 4, height: 1 }, scene); place(sign,x,z,height(x,z)+2.2); sign.billboardMode = Mesh.BILLBOARDMODE_Y;venueSigns.push(sign);
     const mat = new StandardMaterial(`${text} material`, scene); mat.diffuseTexture = texture; mat.emissiveColor = Color3.White(); mat.disableLighting = true; sign.material = mat;
   }
   label('START POOL', b.minX + 1, venue.start.z + 1, '#c8f078');
@@ -189,7 +190,8 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
   spray.setBoundingInfo(new BoundingInfo(new Vector3(-20,-10,-5),new Vector3(110,12,180)));
   let lastTime = -1;
   return {
-    update(time: number, delta: number, debug: boolean) {
+    update(time: number, delta: number, debug: boolean, overview=false) {
+      for(const sign of venueSigns)sign.setEnabled(debug||overview);
       riverMaterial.update(time);
       for(const h of hanging) {h.node.rotation.x=.012*Math.sin(time*.9+h.phase);h.node.rotation.z=.008*Math.sin(time*1.3+h.phase);}
 

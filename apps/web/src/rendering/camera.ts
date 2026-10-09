@@ -9,8 +9,8 @@ export function createChaseCamera(camera: FreeCamera) {
   return {
     update: (state: BoatState, delta: number, snap = false, waterHeight = 0) => {
       const sin = Math.sin(state.yaw), cos = Math.cos(state.yaw);
-      desired.set(state.x - sin * 6.8, waterHeight + 2.8, state.z - cos * 6.8);
-      desiredTarget.set(state.x + sin * 7 + state.velocityX * 0.3, waterHeight + 1.0, state.z + cos * 7 + state.velocityZ * 0.3);
+      desired.set(state.x - sin * 4.6, waterHeight + 2.15, state.z - cos * 4.6);
+      desiredTarget.set(state.x + sin * 7 + state.velocityX * 0.3, waterHeight + 1.2, state.z + cos * 7 + state.velocityZ * 0.3);
       const alpha = snap ? 1 : smoothingWeight(delta);
       Vector3.LerpToRef(camera.position, desired, alpha, camera.position);
       Vector3.LerpToRef(target, desiredTarget, alpha, target);

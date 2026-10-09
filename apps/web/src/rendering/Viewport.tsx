@@ -15,12 +15,13 @@ import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
-import { CreateCapsule } from '@babylonjs/core/Meshes/Builders/capsuleBuilder';
+import { createKayak } from './kayak';
 import { CreateLines } from '@babylonjs/core/Meshes/Builders/linesBuilder';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { createSimulation } from '@rapidhelm/wasm-bridge';
 import { createRuntime } from '../game/runtime';
 import { createKeyboardInput } from '../input/keyboard';
+import { createPaddler } from './paddler';
 import { createChaseCamera } from './camera';
 import { createVenueScene } from './venueScene';
 import { initialVenue } from '../game/venue';
@@ -45,14 +46,15 @@ export function Viewport() {
       const overviewX=(minX+maxX)/2,overviewZ=(minZ+maxZ)/2;
       const markerMat = new StandardMaterial('markers', scene); markerMat.diffuseColor = new Color3(0.2, 0.25, 0.27);
       const boat = new TransformNode('boat-state', scene);
-      const hull = CreateCapsule('kayak', { radius: 0.42, height: 3.8 }, scene); hull.parent = boat; hull.rotation.x = Math.PI / 2; hull.scaling.z = 0.55;
-      const boatMat = new StandardMaterial('kayak', scene); boatMat.diffuseColor = new Color3(0.72, 0.95, 0.2); hull.material = boatMat;
+      const hull = createKayak(scene); hull.parent = boat;
+      const boatMat = new StandardMaterial('kayak', scene); boatMat.diffuseColor = new Color3(0.80, 0.88, 0.87); hull.material = boatMat;
       const cockpit = CreateSphere('cockpit', { diameter: 0.65, segments: 12 }, scene); cockpit.parent = boat; cockpit.scaling.set(1, 0.4, 1.5); cockpit.position.set(0, 0.23, -0.1); cockpit.material = markerMat;
       const nose = CreateBox('bow-marker', { width: 0.3, height: 0.18, depth: 0.45 }, scene); nose.parent = boat; nose.position.set(0, 0.25, 1.3); nose.material = markerMat;
       const velocityPoints = [new Vector3(), new Vector3()];
       const headingPoints = [new Vector3(), new Vector3()];
       const velocityLine = CreateLines('world-velocity', { points: velocityPoints, updatable: true }, scene); velocityLine.color = new Color3(0.2, 0.9, 1);
       const headingLine = CreateLines('forward-heading', { points: headingPoints, updatable: true }, scene); headingLine.color = new Color3(1, 0.72, 0.25);
+      const paddler=createPaddler(scene,boat);
       const input = createKeyboardInput(() => useSession.getState().restart(), () => { runtime.suspend(); resumeCamera = true; });
       let resumeCamera = false, hudTime = 0, frames = 0, simulationTotal = 0, renderTotal = 0, frameTotal = 0;
       const resetCamera = () => { chase.update(runtime.read(), 0, true, sim.sampleWater(runtime.read().x, runtime.read().z, 0).height); hudTime = 0; frames = 0; simulationTotal = 0; renderTotal = 0; frameTotal = 0; useSession.setState({ diagnostics: emptyDiagnostics }); };
@@ -68,7 +70,8 @@ export function Viewport() {
       engine.runRenderLoop(() => {
         if (document.hidden) return;
         const delta = Math.min(engine.getDeltaTime() / 1000, 0.25);
-        const frame = runtime.update(delta, input.read());
+        const controls=input.read();
+        const frame = runtime.update(delta, controls);paddler.update(delta,controls);
         const s = frame.state;
         const water = sim.sampleWater(s.x, s.z, frame.time);
         boat.position.set(s.x, water.height + 0.22, s.z);
@@ -80,7 +83,7 @@ export function Viewport() {
           resumeCamera=true;
         } else {chase.update(s,delta,resumeCamera,water.height);resumeCamera=false;}
         const debug = useSession.getState().debug;
-        venueScene.update(frame.time, delta, debug);
+        venueScene.update(frame.time, delta, debug,useSession.getState().overview);
         velocityLine.setEnabled(debug); headingLine.setEnabled(debug);
         if (debug) {
           velocityPoints[0].set(s.x, water.height + 0.9, s.z); velocityPoints[1].set(s.x + s.velocityX, water.height + 0.9, s.z + s.velocityZ);
