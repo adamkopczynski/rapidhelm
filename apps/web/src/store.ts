@@ -1,2 +1,18 @@
 import { create } from 'zustand';
-export const useSession = create<{ status: string; speed: number; resetId: number; restart(): void }>((set) => ({ status: 'Loading simulation', speed: 0, resetId: 0, restart: () => set((s) => ({ resetId: s.resetId + 1 })) }));
+import type { BoatConfig } from '@rapidhelm/content-schema';
+import { baseline } from './game/config';
+export interface Diagnostics {
+  forwardSpeed: number; lateralSpeed: number; yawRate: number; heading: number; x: number; z: number;
+  steps: number; simulationMs: number; renderMs: number; frameMs: number;
+}
+export const emptyDiagnostics: Diagnostics = { forwardSpeed: 0, lateralSpeed: 0, yawRate: 0, heading: 0, x: 0, z: 0, steps: 0, simulationMs: 0, renderMs: 0, frameMs: 0 };
+interface Session {
+  status: string; diagnostics: Diagnostics; config: BoatConfig; configRevision: number; resetId: number; debug: boolean;
+  restart(): void; applyConfig(config: BoatConfig): void; setDebug(debug: boolean): void;
+}
+export const useSession = create<Session>((set) => ({
+  status: 'Loading simulation', diagnostics: emptyDiagnostics, config: baseline.config, configRevision: 0, resetId: 0, debug: true,
+  restart: () => set((s) => ({ resetId: s.resetId + 1, diagnostics: emptyDiagnostics })),
+  applyConfig: (config) => set((s) => ({ config, configRevision: s.configRevision + 1, diagnostics: emptyDiagnostics })),
+  setDebug: (debug) => set({ debug }),
+}));

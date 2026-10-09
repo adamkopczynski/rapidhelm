@@ -1,6 +1,10 @@
 @import "tailwindcss";
 :root { font-family: Inter, system-ui, sans-serif; color: #edf5f6; background: #101a23; }
-body { margin: 0; } canvas { display: block; width: 100vw; height: 100vh; outline: none; }
-.hud { position: absolute; top: 28px; left: 28px; padding: 24px; max-width: 390px; border: 1px solid #ffffff20; border-radius: 18px; background: #101a23e8; }
-h1 { font-size: 32px; font-weight: 650; margin: 8px 0; } p { margin: 10px 0; }
-.eyebrow { font-size: 11px; letter-spacing: 2px; color: #b8ef69; } .speed { font-size: 30px; font-variant-numeric: tabular-nums; } small, .controls, .note { font-size: 12px; color: #a7bcc5; } .controls { margin-top: 20px; }
+body { margin: 0; } canvas { display: block; width: 100vw; height: 100vh; outline: none; } canvas:focus-visible { outline: 2px solid #b8ef69; outline-offset: -2px; }
+.hud { position: absolute; top: 20px; left: 20px; padding: 20px; width: min(380px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow-y: auto; border: 1px solid #ffffff20; border-radius: 18px; background: #101a23ed; }
+h1 { font-size: 25px; font-weight: 650; margin: 8px 0; } p { margin: 8px 0; }
+.eyebrow { font-size: 11px; letter-spacing: 2px; color: #b8ef69; } .subtitle, [role=status] { font-size: 12px; color: #bdd0d4; } .speed { font-size: 30px; font-variant-numeric: tabular-nums; } small, .controls, .note { font-size: 11px; color: #a7bcc5; } .controls { margin-top: 14px; }
+.telemetry { font-size: 12px; margin: 10px 0 14px; font-variant-numeric: tabular-nums; } .telemetry div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; } dt { color: #a7bcc5; } dd { text-align: right; }
+.debug-toggle { display: flex; gap: 8px; align-items: center; font-size: 12px; margin-top: 14px; } input[type=checkbox] { accent-color: #b8ef69; }
+.legend { display: grid; font-size: 11px; gap: 4px; } .cyan { color: #55dfef; } .amber { color: #ffbc66; }
+.tuning { border-top: 1px solid #ffffff20; padding-top: 14px; margin-top: 14px; } summary { cursor: pointer; font-size: 14px; font-weight: 600; } .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; } .fields label { font-size: 12px; } .fields span { display: block; font-size: 10px; color: #a7bcc5; } .fields input { display: block; width: 100%; margin-top: 4px; border: 1px solid #49606a; border-radius: 6px; padding: 6px 8px; background: #182b34; color: #edf5f6; } .fields input[aria-invalid=true] { border-color: #ff907e; } .fields em { display: block; font-style: normal; color: #ffad9f; font-size: 10px; margin-top: 4px; } .actions { display: flex; gap: 8px; } .actions button { font-size: 12px; padding: 8px 10px; }

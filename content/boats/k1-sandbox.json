@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "k1-sandbox",
+  "name": "K1 \u00b7 baseline",
+  "config": {
+    "mass": 90,
+    "yawInertia": 65,
+    "forwardThrust": 240,
+    "reverseThrust": 180,
+    "steeringTorque": 100,
+    "forwardDrag": 45,
+    "lateralDrag": 220,
+    "angularDamping": 85
+  }
+}

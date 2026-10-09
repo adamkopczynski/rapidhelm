@@ -4,7 +4,7 @@
 
 pnpm and Turborepo coordinate the workspace. Vite hosts the React application; Babylon.js renders the scene; Zustand stores low-frequency UI/session state. Tailwind and Radix-based button primitives establish the shadcn/ui component pattern. Zod validates content at load boundaries. No server or Next.js is needed for the initial client.
 
-Rust owns position, yaw and speed. The renderer never writes simulation state. The simple foundation dynamics are scaffolding for Sprint 1, not a completed hydrodynamic model.
+Rust owns planar position, world velocity, yaw and yaw rate. The renderer never writes simulation state. Sprint 1 adds thrust, anisotropic drag, steering torque and angular damping; this remains a simplified handling model. Input and fixed-step orchestration live outside scene construction, while React receives sampled diagnostics.
 
 ## Coordinate convention
 
@@ -12,14 +12,16 @@ Meters, seconds, radians. +Y is up, +Z is forward/downstream, +X is right. Yaw z
 
 ## WASM interface
 
-The dependency-free crate exports `reset()`, `advance(steps, throttle, steering)` and `state(index)`. State indices 0–3 represent X, Z, yaw and speed. Inputs are sanitized and clamped. The instance is owned by one main-thread runtime and calls are synchronous; it is not reentrant. Each runtime receives a separate WebAssembly instance. This keeps the initial build free of wasm-bindgen version/tool coupling. A packed state buffer can replace the four scalar reads once profiling justifies it.
+The dependency-free crate exports ABI version 2, `timestep()`, `reset()`, `configure(...)`, `advance(steps, throttle, steering)` and `state(index)`. Named state indices 0–5 represent X, Z, yaw, VX, VZ and yaw rate; indices 6–11 contain the penultimate state. The bridge checks ABI/export compatibility and step count bounds; Rust sanitizes controls and rejects invalid configuration atomically. Applying configuration resets state, while ordinary reset retains configuration.
 
-The TypeScript accumulator runs at 120 Hz, clamps long frames to 250 ms and batches up to 30 steps. A final separate step preserves the penultimate state for interpolation. Rendering interpolates between that state and the current state. Hidden tabs stop stepping; focus loss clears controls. Long stalls intentionally discard wall time rather than catching up indefinitely. Simulation reproducibility assumes the same fixed-step input sequence; wall-clock keyboard timing across render rates is not guaranteed identical.
+The instance is owned by one main-thread runtime with synchronous non-reentrant calls. The TypeScript accumulator uses Rust's exported 1/120 second timestep, clamps long frames to 250 ms and batches up to 30 steps. Rust records the previous state during the batch, so rendering can interpolate without an extra advance call. Continuous yaw avoids heading wrap discontinuities. Hidden tabs stop stepping; blur and editor focus clear held controls and interpolation debt. Catch-up remains bounded. Reproducibility assumes the same per-tick input sequence; wall-clock keyboard sampling across frame rates is not guaranteed identical.
+
+Current and previous snapshots require twelve scalar WASM reads per batch. Profiling includes those reads. A packed buffer is deferred until evidence justifies the added interface complexity.
 
 Turborepo declares Rust source, manifests, lockfile and build scripts as WASM task inputs. Generated WASM is ignored by Git and rebuilt before dev/build/typecheck/test tasks. Rust source edits require a rebuild and browser reload.
 
 ## Verification boundaries
 
-Native Rust tests verify propulsion, drag, batching equivalence and invalid inputs. Vitest verifies the timestep accumulator across render rates and the stall cap. Playwright verifies loading the compiled WASM, stepping through controls and resetting, with page errors collected. Software WebGL in browser tests confirms startup, not target GPU performance or visual quality.
+Native Rust tests cover propulsion, anisotropic/angular damping, momentum, configuration atomicity, reset, batching, replay, and sustained stability. Vitest tests exercise the actual compiled WASM and replay fixed-tick inputs at synthetic 30/60/144 Hz schedules, alongside clock, interpolation, camera smoothing, configuration and input mapping. Playwright checks forward/reverse/turning, tuning, reset, editor focus, blur, repeat keys and debug rendering.
 
-Manual milestone checklist: start the app, paddle/reverse/turn, release keys, restart by key and button, change tab and return, resize the window, inspect camera comfort and control feel. Record frame times on target hardware before accepting performance.
+Software WebGL verifies rendering and gives a repeatable baseline; it does not establish target-GPU performance or gameplay quality. See the sprint validation note for outstanding manual checks.

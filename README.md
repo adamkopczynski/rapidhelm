@@ -1,6 +1,6 @@
 # Rapidhelm — Canoe Slalom
 
-Browser-first canoe slalom game. Sprint 0 provides a controllable placeholder kayak in a Babylon.js scene, driven by the real Rust/WASM simulation.
+Browser-first canoe slalom game. Sprint 1 provides a tunable boat physics sandbox in a Babylon.js scene, driven by the real Rust/WASM simulation.
 
 ## Requirements
 
@@ -18,7 +18,7 @@ pnpm dev
 ```
 
 Open http://127.0.0.1:5173. Turborepo compiles WASM before starting Vite.
-Use W/S to paddle/reverse, A/D to turn, and R or the button to restart.
+Use W/S to paddle/brake/reverse, A/D to apply steering torque, and R or the button to restart. Open Handling laboratory to edit thrust, drag, mass and turning parameters. Apply tuning resets the boat; restart keeps the selected parameters; Restore defaults applies the baseline preset. Editing fields and losing focus clear gameplay input.
 After changing Rust, run `pnpm build` and reload the browser; Rust changes are not hot-reloaded.
 
 ## Verification
@@ -38,10 +38,12 @@ pnpm test:e2e             # browser startup, actual WASM movement, restart
 - `packages/wasm-bridge`: typed loading and batched stepping boundary.
 - `packages/content-schema`: Zod validation for versioned content; initial venue schema.
 - `tests/e2e`: Playwright smoke test.
-- [Architecture](docs/architecture/foundation.md) and [original project brief](docs/kickoff.md).
+- [Architecture](docs/architecture/foundation.md), [physics model](docs/physics/boat-sandbox.md), [Sprint 1 validation](docs/development/sprint-1-validation.md), and [original project brief](docs/kickoff.md).
 
 ## Current scope
 
-This is a foundation sandbox: still water, placeholder boat, basic propulsion and turning, chase camera, restart, fixed-step updates and render interpolation. It does not yet model hydrodynamics, currents, collisions, gates, race rules, gamepad input or realistic water. WebGL2 is the initial renderer; WebGPU negotiation is deferred. Gameplay quality and the 60 FPS target require interactive testing on target hardware.
+The sandbox models planar momentum, continuous thrust, body-relative linear drag, steering torque and angular damping. It includes a smoothed chase camera, live tuning, velocity/heading vectors and sampled CPU diagnostics. Water is still and geometry is placeholder; banks do not collide. Currents, gates, race rules, gamepad input and realistic water are pending. WebGL2 is the initial renderer. Gameplay quality and the 60 FPS target require interactive testing on target hardware.
 
-Next milestone: Sprint 1 boat dynamics and configurable tuning before river currents and whitewater visuals.
+[Sprint 1 plan](docs/development/sprint-1.md) is implemented, with manual handling acceptance pending. After that acceptance, Sprint 2 introduces river currents and eddies.
+
+For a repeatable software-WebGL sample, start `pnpm dev` and run `node scripts/profile-sandbox.mjs`. Results go to `test-results/sprint-1-performance.json`; this is not a target-GPU benchmark.
