@@ -1,5 +1,6 @@
 //! Rust-owned 120 Hz planar boat simulation: meters, seconds, radians, +Z forward.
 pub mod boat;
+pub mod channel;
 pub mod collision;
 pub mod physics;
 pub mod river;

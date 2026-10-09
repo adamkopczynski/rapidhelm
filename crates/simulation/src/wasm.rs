@@ -1,7 +1,7 @@
 use crate::{
     boat::BoatConfig,
     physics::{DT, Simulation},
-    river::{FlowRegion, MAX_FEATURES, Obstacle, Pocket, Venue, WaterSample},
+    river::{Drop, FlowRegion, MAX_FEATURES, Obstacle, Pocket, Venue, WaterSample},
 };
 use std::cell::RefCell;
 const MAX_GRID: usize = 4096;
@@ -10,11 +10,11 @@ thread_local! {
     static STAGED: RefCell<Option<Venue>> = const { RefCell::new(None) };
     static SAMPLE: RefCell<[f64; 8]> = const { RefCell::new([0.0; 8]) };
     static FRAME: RefCell<[f64; 3]> = const { RefCell::new([0.0;3]) };
-    static GRID: RefCell<[f32; MAX_GRID * 5]> = const { RefCell::new([0.0; MAX_GRID * 5]) };
+    static GRID: RefCell<[f32; MAX_GRID * 7]> = const { RefCell::new([0.0; MAX_GRID * 7]) };
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn abi_version() -> u32 {
-    4
+    5
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn timestep() -> f64 {
@@ -128,7 +128,12 @@ pub extern "C" fn venue_obstacle(x: f64, z: f64, radius: f64) -> u32 {
         if let Some(v) = staged
             && v.obstacle_count < MAX_FEATURES
         {
-            v.obstacles[v.obstacle_count] = Obstacle { x, z, radius };
+            v.obstacles[v.obstacle_count] = Obstacle {
+                x,
+                z,
+                radius,
+                ..Obstacle::default()
+            };
             v.obstacle_count += 1;
             if v.valid() {
                 return 1;
@@ -185,6 +190,7 @@ pub extern "C" fn water_sample(x: f64, z: f64, time: f64) -> u32 {
     }
     let w = SIM.with_borrow(|s| {
         s.venue
+            .as_ref()
             .map_or(WaterSample::default(), |v| v.sample(x, z, time))
     });
     SAMPLE.with_borrow_mut(|sample| {
@@ -227,7 +233,7 @@ pub extern "C" fn water_grid(
         GRID.with_borrow_mut(|grid| {
             for row in 0..nz {
                 for col in 0..nx {
-                    let w = sim.venue.map_or(WaterSample::default(), |v| {
+                    let w = sim.venue.as_ref().map_or(WaterSample::default(), |v| {
                         v.sample(
                             origin_x + f64::from(col) * dx,
                             origin_z + f64::from(row) * dz,
@@ -288,7 +294,7 @@ pub extern "C" fn channel_frame(x: f64, z: f64, project: u32) -> u32 {
     }
     SIM.with_borrow(|sim| {
         FRAME.with_borrow_mut(|frame| {
-            let Some(v) = sim.venue else {
+            let Some(v) = sim.venue.as_ref() else {
                 return 0;
             };
             let (a, b, c) = if project == 0 {
@@ -325,7 +331,7 @@ pub extern "C" fn course_grid(
     }
     SIM.with_borrow(|sim| {
         GRID.with_borrow_mut(|grid| {
-            let Some(v) = sim.venue else {
+            let Some(v) = sim.venue.as_ref() else {
                 return 0;
             };
             for row in 0..nz {
@@ -336,12 +342,14 @@ pub extern "C" fn course_grid(
                     let offset = v.edge(-1.0, progress) * (1.0 - t) + v.edge(1.0, progress) * t;
                     let (x, z, _) = v.frame(offset, progress);
                     let w = v.sample(x, z, time);
-                    let i = ((row * nx + col) * 5) as usize;
+                    let i = ((row * nx + col) * 7) as usize;
                     grid[i] = w.height as f32;
                     grid[i + 1] = w.velocity_x as f32;
                     grid[i + 2] = w.velocity_z as f32;
                     grid[i + 3] = w.gradient_x as f32;
                     grid[i + 4] = w.gradient_z as f32;
+                    grid[i + 5] = w.turbulence as f32;
+                    grid[i + 6] = w.wave_strength as f32;
                 }
             }
             grid.as_mut_ptr() as usize as u32
@@ -350,11 +358,104 @@ pub extern "C" fn course_grid(
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn channel_edge(side: f64, progress: f64) -> f64 {
-    SIM.with_borrow(|s| s.venue.map_or(f64::NAN, |v| v.edge(side, progress)))
+    SIM.with_borrow(|s| {
+        s.venue
+            .as_ref()
+            .map_or(f64::NAN, |v| v.edge(side, progress))
+    })
 }
 
 /// Static concrete follows the base grade, never a particular wave phase.
 #[unsafe(no_mangle)]
 pub extern "C" fn channel_base_height(progress: f64) -> f64 {
-    SIM.with_borrow(|s| s.venue.map_or(f64::NAN, |v| v.base_height(progress)))
+    SIM.with_borrow(|s| {
+        s.venue
+            .as_ref()
+            .map_or(f64::NAN, |v| v.base_height(progress))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn venue_point(x: f64, z: f64) -> u32 {
+    STAGED.with_borrow_mut(|s| {
+        if let Some(v) = s
+            && v.route.count < crate::channel::MAX_POINTS
+            && x.is_finite()
+            && z.is_finite()
+            && x.abs() < 1000.0
+            && z.abs() < 1000.0
+        {
+            v.route.points[v.route.count] = crate::channel::Point { x, z };
+            v.route.count += 1;
+            return 1;
+        }
+        *s = None;
+        0
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn venue_pools(start: f64, finish: f64, length: f64) -> u32 {
+    STAGED.with_borrow_mut(|s| {
+        if let Some(v) = s {
+            v.start_pool_width = start;
+            v.finish_pool_width = finish;
+            v.pool_length = length;
+            if v.valid() {
+                return 1;
+            }
+        }
+        *s = None;
+        0
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn venue_drop(z: f64, height: f64, length: f64) -> u32 {
+    STAGED.with_borrow_mut(|s| {
+        if let Some(v) = s
+            && v.drop_count < MAX_FEATURES
+        {
+            v.drops[v.drop_count] = Drop { z, height, length };
+            v.drop_count += 1;
+            if v.valid() {
+                return 1;
+            }
+        }
+        *s = None;
+        0
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn venue_block(x: f64, z: f64, width: f64, length: f64, yaw: f64) -> u32 {
+    STAGED.with_borrow_mut(|s| {
+        if let Some(v) = s
+            && v.obstacle_count < MAX_FEATURES
+        {
+            v.obstacles[v.obstacle_count] = Obstacle {
+                x,
+                z,
+                width,
+                length,
+                yaw,
+                radius: (width * 0.5).hypot(length * 0.5),
+            };
+            v.obstacle_count += 1;
+            if v.valid() {
+                return 1;
+            }
+        }
+        *s = None;
+        0
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn channel_metric(x: f64, z: f64) -> f64 {
+    SIM.with_borrow(|s| s.venue.as_ref().map_or(f64::NAN, |v| v.metric(x, z)))
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn water_ceiling(x: f64, z: f64) -> f64 {
+    SIM.with_borrow(|s| {
+        s.venue
+            .as_ref()
+            .map_or(f64::NAN, |v| v.surface_ceiling(x, z))
+    })
 }

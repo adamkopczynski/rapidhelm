@@ -97,7 +97,7 @@ impl Simulation {
         true
     }
     pub fn reset(&mut self) {
-        self.state = if let Some(v) = self.venue {
+        self.state = if let Some(ref v) = self.venue {
             let (x, z, yaw) = v.frame(v.start_x, v.start_z);
             BoatState {
                 x,
@@ -112,8 +112,8 @@ impl Simulation {
         self.time = 0.0;
         self.contacts = 0;
     }
-    pub fn configure_venue(&mut self, venue: Venue) -> bool {
-        if !venue.valid() {
+    pub fn configure_venue(&mut self, mut venue: Venue) -> bool {
+        if !venue.route.prepare(venue.max_z - venue.min_z) || !venue.valid() {
             return false;
         }
         self.venue = Some(venue);
@@ -123,7 +123,7 @@ impl Simulation {
     pub fn advance(&mut self, steps: u32, throttle: f64, steering: f64) {
         for _ in 0..steps.min(30) {
             self.previous = self.state;
-            if let Some(v) = self.venue {
+            if let Some(ref v) = self.venue {
                 let water = v.sample(self.state.x, self.state.z, self.time);
                 let (sin, cos) = self.state.yaw.sin_cos();
                 let bow = v.sample(
@@ -164,7 +164,7 @@ impl Simulation {
                     self.state.x += self.state.velocity_x * sub_dt;
                     self.state.z += self.state.velocity_z * sub_dt;
                     self.state.yaw += self.state.yaw_rate * sub_dt;
-                    contact |= collision::resolve(&mut self.state, self.config, &v);
+                    contact |= collision::resolve(&mut self.state, self.config, v);
                 }
                 if contact {
                     self.contacts = self.contacts.saturating_add(1);

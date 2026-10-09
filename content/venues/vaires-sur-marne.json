@@ -3,8 +3,8 @@
   "id": "vaires-sur-marne",
   "name": "Vaires-sur-Marne \u00b7 Paris 2024 study",
   "bounds": {
-    "minX": -7,
-    "maxX": 7,
+    "minX": -8,
+    "maxX": 8,
     "minZ": 0,
     "maxZ": 300
   },
@@ -14,20 +14,20 @@
     "yaw": 0
   },
   "flow": {
-    "speed": 1.25,
+    "speed": 1.09375,
     "startZ": 14,
     "rampLength": 18
   },
   "water": {
     "waveStartZ": 34,
-    "amplitude": 0.3,
+    "amplitude": 0,
     "wavelength": 6.5,
     "frequency": 1.8,
-    "slope": 0.016245487364620937,
+    "slope": 0,
     "depth": 0.8
   },
   "geometry": {
-    "bendRadius": 30,
+    "bendRadius": 0,
     "pockets": [
       {
         "z": 48,
@@ -65,11 +65,58 @@
         "expansion": 2.5,
         "side": -1
       }
-    ]
+    ],
+    "centerline": [
+      {
+        "x": 62,
+        "z": 0
+      },
+      {
+        "x": 66,
+        "z": 35
+      },
+      {
+        "x": 75,
+        "z": 62
+      },
+      {
+        "x": 69,
+        "z": 88
+      },
+      {
+        "x": 42,
+        "z": 102
+      },
+      {
+        "x": 12,
+        "z": 96
+      },
+      {
+        "x": -8,
+        "z": 78
+      },
+      {
+        "x": -13,
+        "z": 44
+      },
+      {
+        "x": -9,
+        "z": 14
+      },
+      {
+        "x": 6,
+        "z": -4
+      }
+    ],
+    "pools": {
+      "startWidth": 34,
+      "finishWidth": 40,
+      "length": 28
+    }
   },
   "metadata": {
     "competitionLength": 300,
-    "nominalWidth": 14,
+    "nominalWidth": 16,
     "drop": 4.5,
     "discharge": 14,
     "trainingLength": 150,
@@ -79,82 +126,109 @@
   },
   "obstacles": [
     {
-      "id": "rail-baffle-1",
-      "x": 3.5,
-      "z": 38,
-      "radius": 1.3
+      "id": "blue-block-1",
+      "x": 4.4,
+      "z": 36,
+      "radius": 2.1840329667841556,
+      "width": 4.2,
+      "length": 1.2,
+      "yaw": 0.12
     },
     {
-      "id": "rail-baffle-2",
-      "x": -3.5,
-      "z": 60,
-      "radius": 1.3
+      "id": "blue-block-2",
+      "x": -4.4,
+      "z": 64,
+      "radius": 1.8027756377319946,
+      "width": 3.4,
+      "length": 1.2,
+      "yaw": -0.12
     },
     {
-      "id": "rail-baffle-3",
-      "x": 3.5,
-      "z": 88,
-      "radius": 1.3
+      "id": "blue-block-3",
+      "x": 4.4,
+      "z": 94,
+      "radius": 1.8027756377319946,
+      "width": 3.4,
+      "length": 1.2,
+      "yaw": 0.12
     },
     {
-      "id": "rail-baffle-4",
-      "x": -3.5,
-      "z": 102,
-      "radius": 1.3
+      "id": "blue-block-4",
+      "x": -4.4,
+      "z": 116,
+      "radius": 2.1840329667841556,
+      "width": 4.2,
+      "length": 1.2,
+      "yaw": -0.12
     },
     {
-      "id": "rail-baffle-5",
-      "x": 3.5,
-      "z": 128,
-      "radius": 1.3
+      "id": "blue-block-5",
+      "x": 4.4,
+      "z": 132,
+      "radius": 1.8027756377319946,
+      "width": 3.4,
+      "length": 1.2,
+      "yaw": 0.12
     },
     {
-      "id": "rail-baffle-6",
-      "x": -3.5,
-      "z": 145,
-      "radius": 1.3
+      "id": "blue-block-6",
+      "x": -4.4,
+      "z": 166,
+      "radius": 1.8027756377319946,
+      "width": 3.4,
+      "length": 1.2,
+      "yaw": -0.12
     },
     {
-      "id": "rail-baffle-7",
-      "x": 3.5,
-      "z": 172,
-      "radius": 1.3
+      "id": "blue-block-7",
+      "x": 4.4,
+      "z": 192,
+      "radius": 2.1840329667841556,
+      "width": 4.2,
+      "length": 1.2,
+      "yaw": 0.12
     },
     {
-      "id": "rail-baffle-8",
-      "x": -3.5,
-      "z": 188,
-      "radius": 1.3
+      "id": "blue-block-8",
+      "x": -4.4,
+      "z": 210,
+      "radius": 1.8027756377319946,
+      "width": 3.4,
+      "length": 1.2,
+      "yaw": -0.12
     },
     {
-      "id": "rail-baffle-9",
-      "x": 3.5,
-      "z": 216,
-      "radius": 1.3
+      "id": "blue-block-9",
+      "x": 4.4,
+      "z": 224,
+      "radius": 1.8027756377319946,
+      "width": 3.4,
+      "length": 1.2,
+      "yaw": 0.12
     },
     {
-      "id": "rail-baffle-10",
-      "x": -3.5,
-      "z": 232,
-      "radius": 1.3
+      "id": "blue-block-10",
+      "x": -4.4,
+      "z": 248,
+      "radius": 2.1840329667841556,
+      "width": 4.2,
+      "length": 1.2,
+      "yaw": -0.12
     },
     {
-      "id": "rail-baffle-11",
-      "x": 3.5,
-      "z": 262,
-      "radius": 1.3
-    },
-    {
-      "id": "rail-baffle-12",
-      "x": -3.5,
-      "z": 281,
-      "radius": 1.3
+      "id": "blue-block-11",
+      "x": 4.4,
+      "z": 266,
+      "radius": 1.8027756377319946,
+      "width": 3.4,
+      "length": 1.2,
+      "yaw": 0.12
     }
   ],
   "regions": [
     {
       "id": "eddy-1",
-      "x": 4.8,
+      "x": 5.6,
       "z": 48,
       "radiusX": 2.2,
       "radiusZ": 7,
@@ -164,7 +238,7 @@
     },
     {
       "id": "eddy-2",
-      "x": -4.8,
+      "x": -5.6,
       "z": 78,
       "radiusX": 2.2,
       "radiusZ": 7,
@@ -174,7 +248,7 @@
     },
     {
       "id": "eddy-3",
-      "x": 4.8,
+      "x": 5.6,
       "z": 112,
       "radiusX": 2.2,
       "radiusZ": 7,
@@ -184,7 +258,7 @@
     },
     {
       "id": "eddy-4",
-      "x": -4.8,
+      "x": -5.6,
       "z": 158,
       "radiusX": 2.2,
       "radiusZ": 7,
@@ -194,7 +268,7 @@
     },
     {
       "id": "eddy-5",
-      "x": 4.8,
+      "x": 5.6,
       "z": 202,
       "radiusX": 2.2,
       "radiusZ": 7,
@@ -204,73 +278,13 @@
     },
     {
       "id": "eddy-6",
-      "x": -4.8,
+      "x": -5.6,
       "z": 248,
       "radiusX": 2.2,
       "radiusZ": 7,
       "velocityX": 0,
       "velocityZ": -1.4,
       "swirl": -0.7
-    },
-    {
-      "id": "jet-1",
-      "x": 0,
-      "z": 43,
-      "radiusX": 2.5,
-      "radiusZ": 4,
-      "velocityX": 0.35,
-      "velocityZ": 3.1,
-      "swirl": 0
-    },
-    {
-      "id": "jet-2",
-      "x": 0,
-      "z": 94,
-      "radiusX": 2.5,
-      "radiusZ": 4,
-      "velocityX": -0.35,
-      "velocityZ": 3.1,
-      "swirl": 0
-    },
-    {
-      "id": "jet-3",
-      "x": 0,
-      "z": 134,
-      "radiusX": 2.5,
-      "radiusZ": 4,
-      "velocityX": 0.35,
-      "velocityZ": 3.1,
-      "swirl": 0
-    },
-    {
-      "id": "jet-4",
-      "x": 0,
-      "z": 178,
-      "radiusX": 2.5,
-      "radiusZ": 4,
-      "velocityX": -0.35,
-      "velocityZ": 3.1,
-      "swirl": 0
-    },
-    {
-      "id": "jet-5",
-      "x": 0,
-      "z": 222,
-      "radiusX": 2.5,
-      "radiusZ": 4,
-      "velocityX": 0.35,
-      "velocityZ": 3.1,
-      "swirl": 0
-    },
-    {
-      "id": "jet-6",
-      "x": 0,
-      "z": 268,
-      "radiusX": 2.5,
-      "radiusZ": 4,
-      "velocityX": -0.35,
-      "velocityZ": 3.1,
-      "swirl": 0
     }
   ],
   "gates": [
@@ -414,5 +428,54 @@
       "width": 3,
       "direction": "downstream"
     }
-  ]
+  ],
+  "hydraulics": {
+    "drops": [
+      {
+        "z": 34,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 62,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 92,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 130,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 164,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 190,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 222,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 246,
+        "height": 0.5,
+        "length": 4
+      },
+      {
+        "z": 264,
+        "height": 0.5,
+        "length": 4
+      }
+    ]
+  }
 }

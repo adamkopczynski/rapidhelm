@@ -10,11 +10,13 @@ fn training() -> Venue {
         x: -4.0,
         z: 43.0,
         radius: 1.4,
+        ..Obstacle::default()
     };
     v.obstacles[1] = Obstacle {
         x: 3.5,
         z: 55.0,
         radius: 1.2,
+        ..Obstacle::default()
     };
     v.obstacle_count = 2;
     v.regions[0] = FlowRegion {
@@ -307,4 +309,84 @@ fn curved_capsule_contacts_hold_at_every_heading() {
             }
         }
     }
+}
+
+#[test]
+fn rectangular_baffles_resolve_faces_corners_and_fast_approaches() {
+    let mut v = Venue::default();
+    v.obstacles[0] = Obstacle {
+        x: 0.0,
+        z: 40.0,
+        width: 4.0,
+        length: 1.2,
+        yaw: 0.2,
+        radius: 2.0_f64.hypot(0.6),
+    };
+    v.obstacle_count = 1;
+    let assert_block_clear = |s: BoatState| {
+        for i in 0..=100 {
+            let d = HALF_SEGMENT * (f64::from(i) / 50.0 - 1.0);
+            let dx = s.x + d * s.yaw.sin();
+            let dz = s.z + d * s.yaw.cos() - 40.0;
+            let x = dx * 0.2_f64.cos() - dz * 0.2_f64.sin();
+            let z = dx * 0.2_f64.sin() + dz * 0.2_f64.cos();
+            assert!((x.abs() - 2.0).max(0.0).hypot((z.abs() - 0.6).max(0.0)) >= HULL_RADIUS - 1e-6);
+        }
+    };
+    for heading in 0..32 {
+        let mut s = BoatState {
+            x: 2.2,
+            z: 40.0,
+            yaw: f64::from(heading) * std::f64::consts::TAU / 32.0,
+            ..BoatState::default()
+        };
+        collision::resolve(&mut s, BoatConfig::default(), &v);
+        assert_block_clear(s);
+    }
+    let mut sim = Simulation::default();
+    assert!(sim.configure_venue(v));
+    sim.state = BoatState {
+        x: 0.0,
+        z: 32.0,
+        velocity_z: 1000.0,
+        ..BoatState::default()
+    };
+    sim.advance(3, 0.0, 0.0);
+    assert!(sim.contacts > 0);
+    assert_block_clear(sim.state);
+}
+#[test]
+fn spline_route_roundtrips_offsets_and_rejects_a_folded_course() {
+    use crate::channel::{Point, Route};
+    let mut route = Route::default();
+    for (x, z) in [
+        (62.0, 0.0),
+        (66.0, 35.0),
+        (75.0, 62.0),
+        (69.0, 88.0),
+        (42.0, 102.0),
+        (12.0, 96.0),
+        (-8.0, 78.0),
+        (-13.0, 44.0),
+        (-9.0, 14.0),
+        (6.0, -4.0),
+    ] {
+        route.points[route.count] = Point { x, z };
+        route.count += 1;
+    }
+    assert!(route.prepare(300.0));
+    assert!(route.valid_width(11.0));
+    for s in [0.0, 5.0, 40.0, 98.0, 150.0, 210.0, 290.0, 300.0] {
+        for offset in [-8.0, 0.0, 8.0] {
+            let (x, z, _) = route.frame(offset, s);
+            let (a, b) = route.project(x, z);
+            assert!(
+                (offset - a).abs() < 1e-6 && (s - b).abs() < 1e-6,
+                "{offset} {s} {a} {b}"
+            );
+        }
+    }
+    route.points[5] = route.points[1];
+    assert!(route.prepare(300.0));
+    assert!(!route.valid_width(11.0));
 }

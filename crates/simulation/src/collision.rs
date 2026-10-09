@@ -45,7 +45,11 @@ pub fn resolve(state: &mut BoatState, config: BoatConfig, venue: &Venue) -> bool
     let mut contacted = false;
     for _ in 0..8 {
         let mut corrected = false;
-        if venue.bend_radius == 0.0 && venue.pocket_count == 0 {
+        if venue.bend_radius == 0.0
+            && !venue.route.ready
+            && venue.pocket_count == 0
+            && venue.pool_length == 0.0
+        {
             let extent_x = HULL_RADIUS + HALF_SEGMENT * state.yaw.sin().abs();
             let extent_z = HULL_RADIUS + HALF_SEGMENT * state.yaw.cos().abs();
             if state.x < venue.min_x + extent_x {
@@ -86,6 +90,7 @@ pub fn resolve(state: &mut BoatState, config: BoatConfig, venue: &Venue) -> bool
                         let derivative = (venue.edge(side, progress + 0.01)
                             - venue.edge(side, progress - 0.01))
                             / 0.02;
+                        let derivative = derivative / venue.metric(offset, progress);
                         let norm = (1.0 + derivative * derivative).sqrt();
                         let nx = side * (-tc + derivative * ts) / norm;
                         let nz = side * (ts + derivative * tc) / norm;
@@ -114,7 +119,58 @@ pub fn resolve(state: &mut BoatState, config: BoatConfig, venue: &Venue) -> bool
             }
         }
         for o in &venue.obstacles[..venue.obstacle_count] {
-            let (ox, oz, _) = venue.frame(o.x, o.z);
+            let (ox, oz, oyaw) = venue.frame(o.x, o.z);
+            if o.width > 0.0 {
+                let (sin, cos) = state.yaw.sin_cos();
+                let (bs, bc) = (oyaw + o.yaw).sin_cos();
+                for i in 0..=24 {
+                    let d = HALF_SEGMENT * (f64::from(i) / 12.0 - 1.0);
+                    let px = state.x + d * sin - ox;
+                    let pz = state.z + d * cos - oz;
+                    let lx = px * bc - pz * bs;
+                    let lz = px * bs + pz * bc;
+                    let qx = lx.clamp(-o.width * 0.5, o.width * 0.5);
+                    let qz = lz.clamp(-o.length * 0.5, o.length * 0.5);
+                    let dx = lx - qx;
+                    let dz = lz - qz;
+                    let distance = dx.hypot(dz);
+                    let (nx, nz, penetration) = if distance > 1e-9 {
+                        (dx / distance, dz / distance, HULL_RADIUS + 0.015 - distance)
+                    } else {
+                        let ex = o.width * 0.5 - lx.abs();
+                        let ez = o.length * 0.5 - lz.abs();
+                        if ex < ez {
+                            (
+                                if lx >= 0.0 { 1.0 } else { -1.0 },
+                                0.0,
+                                HULL_RADIUS + ex + 0.015,
+                            )
+                        } else {
+                            (
+                                0.0,
+                                if lz >= 0.0 { 1.0 } else { -1.0 },
+                                HULL_RADIUS + ez + 0.015,
+                            )
+                        }
+                    };
+                    if penetration > 0.0 {
+                        let wx = nx * bc + nz * bs;
+                        let wz = -nx * bs + nz * bc;
+                        state.x += wx * penetration;
+                        state.z += wz * penetration;
+                        impulse(
+                            state,
+                            config,
+                            wx,
+                            wz,
+                            d * sin - wx * HULL_RADIUS,
+                            d * cos - wz * HULL_RADIUS,
+                        );
+                        corrected = true;
+                    }
+                }
+                continue;
+            }
             let (distance, dx, dz) = clearance(*state, ox, oz);
             let min_distance = o.radius + HULL_RADIUS;
             if distance >= min_distance {

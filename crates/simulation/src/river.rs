@@ -3,6 +3,9 @@ use crate::collision::{HALF_SEGMENT, HULL_RADIUS};
 pub const MAX_FEATURES: usize = 16;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Obstacle {
+    pub width: f64,
+    pub length: f64,
+    pub yaw: f64,
     pub x: f64,
     pub z: f64,
     pub radius: f64,
@@ -34,8 +37,20 @@ impl Default for Pocket {
         }
     }
 }
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Drop {
+    pub z: f64,
+    pub height: f64,
+    pub length: f64,
+}
 #[derive(Clone, Copy, Debug)]
 pub struct Venue {
+    pub route: crate::channel::Route,
+    pub start_pool_width: f64,
+    pub finish_pool_width: f64,
+    pub pool_length: f64,
+    pub drops: [Drop; MAX_FEATURES],
+    pub drop_count: usize,
     pub bend_radius: f64,
     pub pockets: [Pocket; MAX_FEATURES],
     pub pocket_count: usize,
@@ -63,6 +78,12 @@ pub struct Venue {
 impl Default for Venue {
     fn default() -> Self {
         Self {
+            route: crate::channel::Route::default(),
+            start_pool_width: 0.0,
+            finish_pool_width: 0.0,
+            pool_length: 0.0,
+            drops: [Drop::default(); MAX_FEATURES],
+            drop_count: 0,
             bend_radius: 0.0,
             pockets: [Pocket::default(); MAX_FEATURES],
             pocket_count: 0,
@@ -92,6 +113,9 @@ impl Default for Venue {
 impl Venue {
     pub fn valid(&self) -> bool {
         let values = [
+            self.start_pool_width,
+            self.finish_pool_width,
+            self.pool_length,
             self.bend_radius,
             self.min_x,
             self.max_x,
@@ -114,6 +138,7 @@ impl Venue {
             || self.obstacle_count > MAX_FEATURES
             || self.region_count > MAX_FEATURES
             || self.pocket_count > MAX_FEATURES
+            || self.drop_count > MAX_FEATURES
         {
             return false;
         }
@@ -150,6 +175,29 @@ impl Venue {
         {
             return false;
         }
+        if self.start_pool_width != 0.0
+            && (!(16.0..=44.0).contains(&self.start_pool_width)
+                || !(16.0..=44.0).contains(&self.finish_pool_width)
+                || !(20.0..=40.0).contains(&self.pool_length))
+        {
+            return false;
+        }
+        if self.route.count != 0 && self.route.ready && !self.route.valid_width(self.max_x + 3.0) {
+            return false;
+        }
+        for (i, d) in self.drops[..self.drop_count].iter().enumerate() {
+            if ![d.z, d.height, d.length].iter().all(|v| v.is_finite())
+                || !(0.1..=0.9).contains(&d.height)
+                || !(2.0..=8.0).contains(&d.length)
+                || d.z < self.flow_start + self.flow_ramp
+                || d.z + d.length > self.max_z - self.pool_length
+            {
+                return false;
+            }
+            if i > 0 && d.z < self.drops[i - 1].z + self.drops[i - 1].length + 8.0 {
+                return false;
+            }
+        }
         for p in &self.pockets[..self.pocket_count] {
             if ![p.z, p.length, p.expansion, p.side]
                 .iter()
@@ -173,12 +221,21 @@ impl Venue {
             return false;
         }
         for (i, o) in self.obstacles[..self.obstacle_count].iter().enumerate() {
-            if ![o.x, o.z, o.radius].iter().all(|v| v.is_finite())
+            if ![o.x, o.z, o.radius, o.width, o.length, o.yaw]
+                .iter()
+                .all(|v| v.is_finite())
                 || !(0.4..=3.0).contains(&o.radius)
                 || o.x - o.radius < self.min_x + 0.5
                 || o.x + o.radius > self.max_x - 0.5
                 || o.z - o.radius < self.flow_start + self.flow_ramp
                 || o.z + o.radius > self.max_z - 3.0
+            {
+                return false;
+            }
+            if o.width != 0.0
+                && (!(0.6..=6.0).contains(&o.width)
+                    || !(0.4..=3.0).contains(&o.length)
+                    || o.radius < (o.width * 0.5).hypot(o.length * 0.5))
             {
                 return false;
             }
@@ -247,7 +304,9 @@ impl Venue {
         let (_, _, yaw) = self.frame(offset, progress);
         let mut w = self.local_sample(offset, progress, time);
         let (sin, cos) = yaw.sin_cos();
-        let metric = if self.bend_radius > 0.0
+        let metric = if self.route.ready {
+            self.route.metric(offset, progress)
+        } else if self.bend_radius > 0.0
             && progress > self.straight_length()
             && progress < self.max_z - self.straight_length()
         {
@@ -268,11 +327,17 @@ impl Venue {
     fn local_sample(&self, x: f64, z: f64, time: f64) -> WaterSample {
         let ramp = smooth((z - self.flow_start) / self.flow_ramp);
         let center_x = (self.min_x + self.max_x) * 0.5;
-        let bank_distance =
-            ((x - center_x).abs() / ((self.max_x - self.min_x) * 0.5)).clamp(0.0, 1.0);
+        let bank_distance = ((x - center_x).abs()
+            / self.edge(if x < 0.0 { -1.0 } else { 1.0 }, z).abs())
+        .clamp(0.0, 1.0);
         let bank_factor = 1.0 - 0.65 * bank_distance.powi(4);
         let mut vx = 0.0;
-        let mut vz = self.current_speed * ramp * bank_factor;
+        let finish = if self.drop_count > 0 {
+            1.0 - 0.85 * smooth((z - (self.max_z - self.pool_length)) / self.pool_length)
+        } else {
+            1.0
+        };
+        let mut vz = self.current_speed * ramp * bank_factor * finish;
         let mut turbulence: f64 = 0.0;
         // Local potential-flow deflection around circular obstacles plus a damped wake.
         for o in &self.obstacles[..self.obstacle_count] {
@@ -298,6 +363,9 @@ impl Venue {
             vx += (r.velocity_x - dz * r.swirl - vx) * blend;
             vz += (r.velocity_z + dx * r.swirl - vz) * blend;
             turbulence = turbulence.max(blend * (1.0 - blend) * 4.0);
+        }
+        if self.drop_count > 0 {
+            return self.whitewater_sample(x, z, time, vx, vz, turbulence);
         }
         // Smooth, deterministic travelling waves: gradients exert planar forces.
         let envelope_t = (z - self.wave_start) / 8.0;
@@ -327,6 +395,12 @@ impl Venue {
         }
     }
     pub fn base_height(&self, z: f64) -> f64 {
+        if self.drop_count > 0 {
+            return self.drops[..self.drop_count]
+                .iter()
+                .map(|d| d.height * (1.0 - smooth((z - d.z) / d.length)))
+                .sum();
+        }
         // Flat starting pool; a smooth slope entrance avoids a surface discontinuity.
         let d = (z - self.flow_start).max(0.0);
         let length = self.flow_ramp;
@@ -339,6 +413,12 @@ impl Venue {
         -self.slope * integral
     }
     fn base_gradient(&self, z: f64) -> f64 {
+        if self.drop_count > 0 {
+            return -self.drops[..self.drop_count]
+                .iter()
+                .map(|d| d.height * smooth_derivative((z - d.z) / d.length) / d.length)
+                .sum::<f64>();
+        }
         -self.slope * smooth((z - self.flow_start) / self.flow_ramp)
     }
 }
@@ -349,6 +429,9 @@ impl Venue {
     }
     /// Course coordinates are lateral metres and centreline arc-length metres.
     pub fn frame(&self, offset: f64, progress: f64) -> (f64, f64, f64) {
+        if self.route.ready {
+            return self.route.frame(offset, progress);
+        }
         if self.bend_radius == 0.0 {
             return (offset, progress, 0.0);
         }
@@ -365,6 +448,9 @@ impl Venue {
         (x + offset * yaw.cos(), z - offset * yaw.sin(), yaw)
     }
     pub fn project(&self, x: f64, z: f64) -> (f64, f64) {
+        if self.route.ready {
+            return self.route.project(x, z);
+        }
         if self.bend_radius == 0.0 {
             return (x, z);
         }
@@ -383,6 +469,17 @@ impl Venue {
     }
     pub fn edge(&self, side: f64, progress: f64) -> f64 {
         let mut edge = if side < 0.0 { self.min_x } else { self.max_x };
+        if self.pool_length > 0.0 {
+            edge = side
+                * crate::channel::pool_half_width(
+                    progress,
+                    self.max_z,
+                    self.start_pool_width,
+                    self.finish_pool_width,
+                    self.pool_length,
+                    self.max_x,
+                );
+        }
         for p in &self.pockets[..self.pocket_count] {
             if p.side == side {
                 let distance = (progress - p.z).abs() / p.length;
@@ -390,5 +487,112 @@ impl Venue {
             }
         }
         edge
+    }
+}
+
+impl Venue {
+    fn whitewater_sample(
+        &self,
+        x: f64,
+        z: f64,
+        time: f64,
+        mut vx: f64,
+        mut vz: f64,
+        mut turbulence: f64,
+    ) -> WaterSample {
+        if z < self.wave_start {
+            return WaterSample {
+                velocity_x: vx,
+                velocity_z: vz,
+                height: self.base_height(z),
+                gradient_z: self.base_gradient(z),
+                depth: self.depth,
+                ..WaterSample::default()
+            };
+        }
+        let mut elevation = 0.0;
+        let mut gx = 0.0;
+        let mut gz = 0.0;
+        let mut strength: f64 = 0.0;
+        let finish = 1.0 - smooth((z - (self.max_z - self.pool_length - 4.0)) / (4.0));
+        let finish_derivative =
+            -smooth_derivative((z - (self.max_z - self.pool_length - 4.0)) / (4.0)) / (4.0);
+        // Fixed crests below drops; only small in-place pulsation, never a travelling ocean wave.
+        for d in &self.drops[..self.drop_count] {
+            let dz = z - (d.z + d.length + 2.0);
+            let lateral = (-x * x / 36.0).exp();
+            let pulse = if time.is_nan() {
+                1.06
+            } else {
+                1.0 + 0.06 * (time * 3.0 + d.z).sin()
+            };
+            let crest = d.height * 0.32 * lateral * (-dz * dz / 6.0).exp() * pulse;
+            elevation += crest;
+            gx += crest * (-x / 18.0);
+            gz += crest * (-dz / 3.0);
+            let jet = (-((z - (d.z + d.length)) / 5.0).powi(2)).exp() * lateral;
+            vz += jet * (2.0 * 9.81 * d.height).sqrt() * 0.7;
+            turbulence = turbulence.max(jet);
+            strength = strength.max(crest);
+        }
+        // Baffle-dependent standing wakes and flow splitting change when blocks move.
+        for o in &self.obstacles[..self.obstacle_count] {
+            let dx = x - o.x;
+            let dz = z - o.z - o.radius - 1.5;
+            let crest = 0.10 * (-dx * dx / 8.0 - dz * dz / 3.0).exp();
+            elevation += crest;
+            gx += crest * (-dx / 4.0);
+            gz += crest * (-2.0 * dz / 3.0);
+            let wake = (-dx * dx / 6.0 - dz * dz / 24.0).exp();
+            if dz > 0.0 {
+                vz -= wake * self.current_speed * 0.9;
+                vx += wake * dx * 0.12;
+            }
+            turbulence = turbulence.max(wake * 0.8);
+            strength = strength.max(crest);
+        }
+        let ceiling = self.base_height(self.min_z);
+        let height = (self.base_height(z) + elevation * finish).clamp(0.0, ceiling);
+        let active = height > 0.0 && height < ceiling;
+        WaterSample {
+            velocity_x: vx,
+            velocity_z: vz,
+            height,
+            gradient_x: if active { gx * finish } else { 0.0 },
+            gradient_z: if active {
+                self.base_gradient(z) + gz * finish + elevation * finish_derivative
+            } else {
+                0.0
+            },
+            wave_strength: strength * finish,
+            turbulence: turbulence * finish,
+            depth: self.depth,
+        }
+    }
+}
+
+impl Venue {
+    pub fn metric(&self, x: f64, z: f64) -> f64 {
+        if self.route.ready {
+            self.route.metric(x, z)
+        } else if self.bend_radius > 0.0
+            && z > self.straight_length()
+            && z < self.max_z - self.straight_length()
+        {
+            1.0 - x / self.bend_radius
+        } else {
+            1.0
+        }
+    }
+    /// Upper surface envelope, used to hang fixed gate poles above surges.
+    pub fn surface_ceiling(&self, x: f64, z: f64) -> f64 {
+        let (offset, progress) = self.project(x, z);
+        if self.drop_count > 0 {
+            self.whitewater_sample(offset, progress, f64::NAN, 0.0, 0.0, 0.0)
+                .height
+        } else {
+            self.base_height(progress)
+                + self.wave_amplitude * 1.3 * smooth((progress - self.wave_start) / 8.0)
+        }
     }
 }
