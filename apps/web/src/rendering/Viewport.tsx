@@ -22,7 +22,7 @@ import { createRuntime } from '../game/runtime';
 import { createKeyboardInput } from '../input/keyboard';
 import { createChaseCamera } from './camera';
 import { createVenueScene } from './venueScene';
-import { trainingVenue } from '../game/venue';
+import { initialVenue } from '../game/venue';
 import { emptyDiagnostics, useSession } from '../store';
 export function Viewport() {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -31,13 +31,13 @@ export function Viewport() {
     let cleanup = () => {};
     void createSimulation().then((sim) => {
       if (disposed || !canvas.current) return;
-      const runtime = createRuntime(sim, useSession.getState().config, trainingVenue);
+      const runtime = createRuntime(sim, useSession.getState().config, initialVenue);
       const engine = new Engine(canvas.current, true);
       const scene = new Scene(engine); scene.clearColor = new Color4(0.62, 0.78, 0.84, 1);
       const camera = new FreeCamera('chase', new Vector3(0, 7, -10), scene); camera.minZ = 0.1;
       const chase = createChaseCamera(camera); chase.update(runtime.read(), 0, true);
       new HemisphericLight('sky', new Vector3(0.2, 1, 0.4), scene);
-      const venueScene = createVenueScene(scene, sim, trainingVenue);
+      const venueScene = createVenueScene(scene, sim, initialVenue);
       const markerMat = new StandardMaterial('markers', scene); markerMat.diffuseColor = new Color3(0.2, 0.25, 0.27);
       const boat = new TransformNode('boat-state', scene);
       const hull = CreateCapsule('kayak', { radius: 0.42, height: 3.8 }, scene); hull.parent = boat; hull.rotation.x = Math.PI / 2; hull.scaling.z = 0.55;
@@ -68,7 +68,10 @@ export function Viewport() {
         const water = sim.sampleWater(s.x, s.z, frame.time);
         boat.position.set(s.x, water.height + 0.22, s.z);
         boat.rotation.set(-Math.atan(water.gradientX * Math.sin(s.yaw) + water.gradientZ * Math.cos(s.yaw)), s.yaw, Math.atan(water.gradientX * Math.cos(s.yaw) - water.gradientZ * Math.sin(s.yaw)));
-        chase.update(s, delta, resumeCamera, water.height); resumeCamera = false;
+        if (useSession.getState().overview) {
+          camera.position.set(30,200,65);camera.setTarget(new Vector3(30,-2,65));
+          resumeCamera=true;
+        } else {chase.update(s,delta,resumeCamera,water.height);resumeCamera=false;}
         const debug = useSession.getState().debug;
         venueScene.update(frame.time, delta, debug);
         velocityLine.setEnabled(debug); headingLine.setEnabled(debug);
@@ -81,8 +84,8 @@ export function Viewport() {
         const renderStart = performance.now(); scene.render(); renderTotal += performance.now() - renderStart;
         simulationTotal += frame.simulationMs; frameTotal += engine.getDeltaTime(); frames++; hudTime += delta;
         if (hudTime >= 0.1) {
-          const a = frame.authoritative; const sin = Math.sin(a.yaw), cos = Math.cos(a.yaw);
-          useSession.setState({ diagnostics: { forwardSpeed: a.velocityX * sin + a.velocityZ * cos, lateralSpeed: a.velocityX * cos - a.velocityZ * sin, yawRate: a.yawRate, heading: ((a.yaw * 180 / Math.PI) % 360 + 360) % 360, x: a.x, z: a.z, flowX: water.velocityX, flowZ: water.velocityZ, waveStrength: water.waveStrength, contacts: frame.contacts, steps: frame.stepsTotal, simulationMs: simulationTotal / frames, renderMs: renderTotal / frames, frameMs: frameTotal / frames } });
+          const a = frame.authoritative; const course=sim.channelFrame(a.x,a.z,true); const sin = Math.sin(a.yaw), cos = Math.cos(a.yaw);
+          useSession.setState({ diagnostics: { progress:course.z, courseFlow:water.velocityX*Math.sin(course.yaw)+water.velocityZ*Math.cos(course.yaw), forwardSpeed: a.velocityX * sin + a.velocityZ * cos, lateralSpeed: a.velocityX * cos - a.velocityZ * sin, yawRate: a.yawRate, heading: ((a.yaw * 180 / Math.PI) % 360 + 360) % 360, x: a.x, z: a.z, flowX: water.velocityX, flowZ: water.velocityZ, waveStrength: water.waveStrength, contacts: frame.contacts, steps: frame.stepsTotal, simulationMs: simulationTotal / frames, renderMs: renderTotal / frames, frameMs: frameTotal / frames } });
           hudTime = 0; frames = 0; simulationTotal = 0; renderTotal = 0; frameTotal = 0;
         }
       });

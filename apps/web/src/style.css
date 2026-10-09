@@ -13,3 +13,6 @@ h1 { font-size: 25px; font-weight: 650; margin: 8px 0; } p { margin: 8px 0; }
 @media (max-width: 850px) { .river-guide { display: none; } }
 
 @media (max-width: 850px) { .hud { width: 250px; left: 12px; top: 12px; padding: 16px; max-height: calc(100vh - 24px); } .hud h1 { font-size: 22px; } .hud .subtitle { font-size: 11px; } .eyebrow { font-size: 9px; } .telemetry { font-size: 11px; } }
+
+.venue-overview .hud { width: 250px; padding: 12px; }
+.venue-overview .hud .speed, .venue-overview .hud .telemetry, .venue-overview .hud .controls, .venue-overview .hud .debug-toggle, .venue-overview .hud .legend, .venue-overview .hud details, .venue-overview .hud .note { display: none; }
