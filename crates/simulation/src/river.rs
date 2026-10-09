@@ -526,7 +526,7 @@ impl Venue {
             } else {
                 1.0 + 0.06 * (time * 3.0 + d.z).sin()
             };
-            let crest = d.height * 0.32 * lateral * (-dz * dz / 6.0).exp() * pulse;
+            let crest = d.height * 0.72 * lateral * (-dz * dz / 6.0).exp() * pulse;
             elevation += crest;
             gx += crest * (-x / 18.0);
             gz += crest * (-dz / 3.0);
@@ -539,7 +539,7 @@ impl Venue {
         for o in &self.obstacles[..self.obstacle_count] {
             let dx = x - o.x;
             let dz = z - o.z - o.radius - 1.5;
-            let crest = 0.10 * (-dx * dx / 8.0 - dz * dz / 3.0).exp();
+            let crest = 0.18 * (-dx * dx / 8.0 - dz * dz / 3.0).exp();
             elevation += crest;
             gx += crest * (-dx / 4.0);
             gz += crest * (-2.0 * dz / 3.0);

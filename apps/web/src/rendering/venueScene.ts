@@ -1,3 +1,5 @@
+import { createRiverMaterial } from './riverMaterial';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData';
@@ -92,7 +94,9 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
   const white=material('white gate bands',Color3.White());
   const red=material('upstream gate',new Color3(0.88,0.16,0.12));
   const green=material('downstream gate',new Color3(0.04,0.55,0.28));
+  function placeHolder(node:TransformNode,x:number,y:number,z:number,yaw:number){node.position.set(x,y,z);node.rotation.y=yaw;}
   const gateDiameter=0.045, poleLength=1.8, clearance=0.2;
+  const hanging: {node:TransformNode;phase:number}[]=[];
   for (const gate of venue.gates) {
     const supports:{x:number;bottom:number}[]=[];
     for (const side of [-1,1]) {
@@ -100,13 +104,17 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
       const x=gate.x+side*(gate.width+gateDiameter)/2;
       const f=frame(x,gate.z),bottom=sim.waterCeiling(f.x,f.z)+clearance;
       supports.push({x,bottom});
+      const hanger=new TransformNode(`pole hanger ${gate.id}`,scene);
+      placeHolder(hanger,f.x,bottom+poleLength,f.z,f.yaw);
+      hanging.push({node:hanger,phase:gate.id*1.7+side});
       for (let band=0;band<9;band++) {
         const pole=CreateCylinder('gate '+gate.id,{diameter:gateDiameter,height:0.2,tessellation:8},scene);
         place(pole,x,gate.z,bottom+0.1+band*0.2);
+        pole.parent=hanger;pole.position.set(0,-poleLength+0.1+band*0.2,0);pole.rotation.y=0;
         pole.material=band%2===0 ? white:(gate.direction==='upstream' ? red:green);
       }
       const tip=CreateCylinder('black gate tip',{diameter:gateDiameter+0.001,height:0.022,tessellation:8},scene);
-      place(tip,x,gate.z,bottom+0.011);tip.material=rockMat;
+      place(tip,x,gate.z,bottom+0.011);tip.material=rockMat;tip.parent=hanger;tip.position.set(0,-poleLength+0.011,0);
     }
     const cableHeight=Math.max(...supports.map(p=>p.bottom))+poleLength+0.4;
     const left=sim.channelEdge(-1,gate.z)-3,right=sim.channelEdge(1,gate.z)+3;
@@ -142,7 +150,7 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
     if (row < NZ - 1 && col < NX - 1) indices.push(i, i + NX, i + 1, i + 1, i + NX, i + NX + 1);
   }
   const water = new Mesh('Rust-sampled river surface', scene); const data = new VertexData(); data.positions = positions; data.normals = normals; data.colors = colors; data.indices = indices; data.applyToMesh(water, true);
-  const waterMat = material('moving river water', Color3.White()); waterMat.specularColor = new Color3(0.3, 0.48, 0.52); waterMat.specularPower = 90; waterMat.backFaceCulling = false; water.material = waterMat;
+  const riverMaterial=createRiverMaterial(scene);water.material=riverMaterial.material;
   let grid = sim.courseGrid(NX, NZ, b.minX, b.minZ, dx, dz, 0);
   function gridValue(x: number, z: number, field: number) {
     const left=sim.channelEdge(-1,z), right=sim.channelEdge(1,z);
@@ -154,7 +162,7 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
   }
   const foam = CreateDisc('flow foam', { radius: 0.5, tessellation: 8 }, scene); foam.bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2));
   const foamMat = material('foam', new Color3(0.8, 0.93, 0.9)); foamMat.emissiveColor = new Color3(0.25, 0.3, 0.3); foamMat.alpha = 0.7; foam.material = foamMat;
-  const foamCount = 700, matrices = new Float32Array(foamCount * 16);
+  const foamCount = 1600, matrices = new Float32Array(foamCount * 16);
   const flakes = Array.from({ length: foamCount }, (_, i) => ({ x: b.minX + 0.8 + ((i * 0.61803398875) % 1) * (width - 1.6), z: venue.flow.startZ + ((i * 0.381966) % 1) * (b.maxZ - venue.flow.startZ - 1) }));
   const scale = new Vector3(), rotation = new Quaternion(), position = new Vector3(), matrix = new Matrix();
   foam.thinInstanceSetBuffer('matrix', matrices, 16, false);
@@ -168,6 +176,9 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
   let lastTime = -1;
   return {
     update(time: number, delta: number, debug: boolean) {
+      riverMaterial.update(time);
+      for(const h of hanging) {h.node.rotation.x=.012*Math.sin(time*.9+h.phase);h.node.rotation.z=.008*Math.sin(time*1.3+h.phase);}
+
       // Mesh upload at 30 Hz; boat sampling/physics continue at their normal cadence.
       if (time - lastTime >= 1 / 30 || time < lastTime || lastTime < 0) {
         grid = sim.courseGrid(NX, NZ, b.minX, b.minZ, dx, dz, time); lastTime = time;
@@ -175,9 +186,8 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
           positions[i * 3 + 1] = grid[i * 7]; const gx = grid[i * 7 + 3], gz = grid[i * 7 + 4], inv = 1 / Math.hypot(gx, 1, gz);
           normals[i * 3] = -gx * inv; normals[i * 3 + 1] = inv; normals[i * 3 + 2] = -gz * inv;
           const turbulence=grid[i*7+5], crest=grid[i*7+6];
-          const fleck=0.7+0.3*Math.sin(positions[i*3]*3.7+positions[i*3+2]*2.3-time*4);
-          const whiteness = Math.min(0.82,turbulence*0.62+crest*1.6)*fleck;
-          colors[i * 4] = 0.13 + whiteness; colors[i * 4 + 1] = 0.32 + whiteness * 0.7; colors[i * 4 + 2] = 0.3 + whiteness * 0.6;
+          colors[i*4]=turbulence;colors[i*4+1]=grid[i*7+1];
+          colors[i*4+2]=grid[i*7+2];colors[i*4+3]=crest;
         }
         water.updateVerticesData(VertexBuffer.PositionKind, positions); water.updateVerticesData(VertexBuffer.NormalKind, normals); water.updateVerticesData(VertexBuffer.ColorKind, colors);
       }
@@ -192,7 +202,7 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
           const angle=o.yaw??0,dx=f.x-o.x,dz=f.z-o.z;
           return Math.abs(dx*Math.cos(angle)-dz*Math.sin(angle))<o.width/2+0.15 && Math.abs(dx*Math.sin(angle)+dz*Math.cos(angle))<(o.length??0)/2+0.15;
         });
-        const turbulent=gridValue(f.x,f.z,5), size=0.06+turbulent*0.32;
+        const turbulent=gridValue(f.x,f.z,5), size=turbulent>.2 ? 0.04+turbulent*0.20 : 0;
         scale.set(hidden ? 0 : size, 1, size*(1.2+Math.hypot(vx,vz)*0.45));
         Quaternion.FromEulerAnglesToRef(0, Math.atan2(vx, vz), 0, rotation);
         const world=frame(f.x,f.z);position.set(world.x, gridValue(f.x, f.z, 0) + 0.04, world.z); Matrix.ComposeToRef(scale, rotation, position, matrix); matrix.copyToArray(matrices, i * 16);

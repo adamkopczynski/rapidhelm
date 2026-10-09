@@ -28,3 +28,18 @@ These are input/rendering smoke checks. A human should still assess paddling fee
 The spline is an estimate from Paris aerial photographs and the architectural site plan, not a survey or the official race gate/block layout. The first new panoramic photo appears to depict a different venue and was used for baffle/whitewater appearance rather than the Paris outline. Nominal width is intentionally increased to 16 m for handling iteration. Training and regatta dimensions are metadata; only the competition channel is playable.
 
 The hydraulics remain parameterized local fields, not a mass-conserving hydraulic solver. See [model assumptions, gate dimensions and sources](../physics/paris-venue.md). Generated WASM and build outputs are ignored and are not committed.
+
+## Whitewater presentation milestone
+
+Rust standing crest gain increased from 0.32 to 0.72 of each drop; obstacle wakes
+increased to 0.18 m. Surface gradients and conservative gate envelopes still come
+from Rust. The renderer adds procedural advected foam, fine normal detail, sky
+Fresnel and sun highlights, plus subtle hanging pole sway. Chase position is
+6.8 m behind and 2.8 m above the sampled water, with forward/velocity look-ahead.
+Fine shading is visual, not additional boat dynamics or a fluid solver.
+
+Automated: pnpm check passed (22 Rust, 17 Vitest), cargo fmt/clippy passed.
+Manual: reloaded in-app development browser; 10 seconds W reached 54.1 m,
+verified the low chase framing and compiled water shader, no console errors.
+Chrome and sustained GPU performance were not tested. Bank assemblies and
+submerged shapers remain the next milestone.
