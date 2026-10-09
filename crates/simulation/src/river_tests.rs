@@ -321,6 +321,7 @@ fn rectangular_baffles_resolve_faces_corners_and_fast_approaches() {
         length: 1.2,
         yaw: 0.2,
         radius: 2.0_f64.hypot(0.6),
+        submerged: false,
     };
     v.obstacle_count = 1;
     let assert_block_clear = |s: BoatState| {
@@ -389,4 +390,35 @@ fn spline_route_roundtrips_offsets_and_rejects_a_folded_course() {
     route.points[5] = route.points[1];
     assert!(route.prepare(300.0));
     assert!(!route.valid_width(11.0));
+}
+
+#[test]
+fn submerged_shaper_changes_current_without_a_planar_hull_contact() {
+    let mut v = Venue::default();
+    v.obstacle_count = 1;
+    v.obstacles[0] = Obstacle {
+        x: 0.0,
+        z: 40.0,
+        width: 2.4,
+        length: 1.0,
+        radius: 1.3,
+        submerged: true,
+        ..Obstacle::default()
+    };
+    assert!(v.valid());
+    let mut state = BoatState {
+        x: 0.0,
+        z: 40.0,
+        velocity_z: 3.0,
+        ..BoatState::default()
+    };
+    let original = state;
+    assert!(!collision::resolve(&mut state, BoatConfig::default(), &v));
+    assert_eq!(state, original);
+    let with = v.sample(0.0, 42.0, 0.0);
+    v.obstacle_count = 0;
+    assert!((with.velocity_z - v.sample(0.0, 42.0, 0.0).velocity_z).abs() > 0.1);
+    v.obstacle_count = 1;
+    v.obstacles[0].submerged = false;
+    assert!(collision::resolve(&mut state, BoatConfig::default(), &v));
 }

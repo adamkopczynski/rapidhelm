@@ -38,7 +38,7 @@ test('Paris compiled simulation stays clear of curved banks and baffles during a
       expect(p.x+0.42).toBeLessThanOrEqual(sim.channelEdge(1,p.z)+1e-5);
       expect(p.z-0.42).toBeGreaterThanOrEqual(-1e-5);expect(p.z+0.42).toBeLessThanOrEqual(300+1e-5);
     }
-    for(const o of venue.obstacles) {
+    for(const o of venue.obstacles.filter(o=>!o.submerged)) {
       const f=sim.channelFrame(o.x,o.z),yaw=f.yaw+(o.yaw??0);
       for(let probe=0;probe<=32;probe++) {
         const d=1.48*(probe/16-1),dx=s.x+d*Math.sin(s.yaw)-f.x,dz=s.z+d*Math.cos(s.yaw)-f.z;
@@ -65,14 +65,39 @@ test('Paris pools, fixed hydraulic crests, gradients and hanging gate envelope',
     expect(w.gradientX).toBeCloseTo((sim.sampleWater(f.x+eps,f.z,2).height-sim.sampleWater(f.x-eps,f.z,2).height)/(2*eps),3);
     expect(w.gradientZ).toBeCloseTo((sim.sampleWater(f.x,f.z+eps,2).height-sim.sampleWater(f.x,f.z-eps,2).height)/(2*eps),3);
   }
-  const crest=sim.channelFrame(0,40),quiet=sim.channelFrame(0,55);
+  const crest=sim.channelFrame(0,38.5),quiet=sim.channelFrame(0,84);
   expect(sim.sampleWater(crest.x,crest.z,0).waveStrength).toBeGreaterThan(.14);
   expect(sim.sampleWater(crest.x,crest.z,5).waveStrength).toBeGreaterThan(.14);
   expect(sim.sampleWater(quiet.x,quiet.z,0).waveStrength).toBeLessThan(.01);
   for(const g of venue.gates) for(const side of [-1,1]) {
     const f=sim.channelFrame(g.x+side*(g.width+.045)/2,g.z),ceiling=sim.waterCeiling(f.x,f.z);
-    for(let i=0;i<20;i++) expect(ceiling+0.2-sim.sampleWater(f.x,f.z,i*.17).height).toBeGreaterThanOrEqual(.2-1e-8);
+    for(let i=0;i<20;i++) {
+      // 3 cm suspension reserve covers the tip's small horizontal pendulum sweep.
+      for(let angle=0;angle<8;angle++) {
+        const a=angle*Math.PI/4;
+        expect(ceiling+.23-sim.sampleWater(f.x+.03*Math.cos(a),f.z+.03*Math.sin(a),i*.17).height).toBeGreaterThanOrEqual(.2-1e-8);
+      }
+    }
   }
   const before=sim.read();expect(()=>sim.configureVenue({...venue,hydraulics:{drops:[{z:34,height:-1,length:4}]}})).toThrow('venue');expect(sim.read()).toEqual(before);
   expect(riverVenueSchema.safeParse({...venue,gates:[{...venue.gates[0],width:4}]}).success).toBe(false);
+});
+
+test('bank baffles exclude current while submerged shapers allow flow over their crests',async()=>{
+  const sim=await load();sim.configureVenue(venue);
+  for(const o of venue.obstacles) {
+    const f=sim.channelFrame(o.x,o.z),w=sim.sampleWater(f.x,f.z,1);
+    if(o.submerged) {
+      expect(Math.hypot(w.velocityX,w.velocityZ)).toBeGreaterThan(.1);
+      const wake=sim.channelFrame(o.x,o.z+o.radius+1.5);
+      expect(sim.sampleWater(wake.x,wake.z,1).waveStrength).toBeGreaterThan(.15);
+    } else {
+      expect(Math.hypot(w.velocityX,w.velocityZ)).toBe(0);
+      const bank=sim.channelEdge(Math.sign(o.x),o.z);
+      expect(Math.abs(o.x)+o.width!/2).toBeGreaterThanOrEqual(Math.abs(bank));
+      expect(Math.abs(o.x)-o.width!/2).toBeGreaterThan(2);
+    }
+  }
+  const first=venue.hydraulics!.drops[0],f=sim.channelFrame(0,first.z+first.length+2);
+  expect(sim.sampleWater(f.x,f.z,1).waveStrength).toBeGreaterThan(.55);
 });

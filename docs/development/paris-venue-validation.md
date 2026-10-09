@@ -43,3 +43,26 @@ Manual: reloaded in-app development browser; 10 seconds W reached 54.1 m,
 verified the low chase framing and compiled water shader, no console errors.
 Chrome and sustained GPU performance were not tested. Bank assemblies and
 submerged shapers remain the next milestone.
+
+## Bank baffles, submerged shapers and drop scale
+
+Eleven bank-connected assemblies render as four blue modules each, sharing a
+filled rectangular collider. Added three submerged flow shapers and ABI 6's
+explicit submerged flag. Solid baffle footprints exclude current; submerged
+shapers retain over-top flow without planar hull contacts. Uneven 0.35–0.9 m drops
+preserve the 4.5 m total elevation difference; added localized crest spray.
+
+Automated checks: 23 Rust and 19 Vitest tests, typecheck/build, cargo fmt and
+clippy. The 150-second WASM replay checks bank/baffle clearance through the
+course. New assertions check bank attachment, solid/current exclusion,
+submerged/current response and hull pass-over, larger first crest, camera
+heading-wrap continuity, and 20 cm minimum pole clearance across phases and a
+3 cm lateral sway envelope. E2E/Playwright remains skipped.
+
+Manual in-app browser: rebuilt/reloaded WASM, paddled to the first drop (38.9 m,
+0.65 m crest), turned, and reached 42.4 m at 3.65 m surface elevation. Visually
+checked joined bank baffles, standing waves, localized foam/spray, hanging
+poles, low chase framing and full venue overview. No captured console errors.
+This is a brief interactive check, not a full human-controlled course run or
+GPU performance certification; Chrome was not controlled. Procedural sky
+reflection and empirical hydraulics remain approximations; see physics notes.

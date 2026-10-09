@@ -8,7 +8,7 @@ The default venue is a playable study based on the supplied aerial photographs a
 | --- | --- |
 | Competition centreline | 300 m |
 | Nominal channel width | 16 m (widened handling study), six wider bank pockets, rounded 34/40 m start/finish pools |
-| Base surface drop | Start +4.5 m → finish 0 m, nine localized 0.5 m drops |
+| Base surface drop | Start +4.5 m → finish 0 m, nine localized 0.35–0.9 m drops |
 | Discharge reference | 14 m³/s |
 | Practice gates | 20 numbered targets, 6 upstream |
 | Training / regatta references | 150 m at 10 m³/s / 2,200 m; metadata only |
@@ -22,9 +22,9 @@ The baseline section uses an assumed effective depth of 0.8 m: `Q / (width × de
 
 This is a parameterized whitewater handling model, not a shallow-water/CFD solver. It does not conserve discharge, compute hydraulic jumps from pressure, evolve free-surface depth or resolve air entrainment. Drop and block placement, wave height, pocket currents and bathymetry remain estimates. Mounting rails are visual; changing authored block geometry affects contacts and its flow/wake field, but there is no interactive rail editor yet.
 
-Gate poles are 1.8 m long, 4.5 cm diameter, with 20 cm stripes, a white bottom stripe and 2.2 cm black base band. Each fixed pole bottom sits 20 cm above Rust's upper local surface envelope, keeping surges below it. The authored 3 m practice-gate width measures inside edges; pole centres are separated by width + diameter. Number panels are 30 cm. Gates are practice targets; there is no contact judging or timer. These dimensions do not imply complete current-ICF course compliance: the [2025 ICF rules, §8.3](https://www.canoeicf.com/sites/default/files/2025_canoe_slalom_competition_rules_final.pdf) specify a 1.4 m gate width, whereas this study retains the user's broader practice-width range.
+Gate poles are 1.8 m long, 4.5 cm diameter, with 20 cm stripes, a white bottom stripe and 2.2 cm black base band. Each pole is suspended above Rust's upper local surface envelope with a 23 cm nominal gap, including a 3 cm reserve for subtle pendulum sway. Number cards sway slightly too. The authored 3 m practice-gate width measures inside edges; pole centres are separated by width + diameter. Number panels are 30 cm. Gates are practice targets; there is no contact judging or timer. These dimensions do not imply complete current-ICF course compliance: the [2025 ICF rules, §8.3](https://www.canoeicf.com/sites/default/files/2025_canoe_slalom_competition_rules_final.pdf) specify a 1.4 m gate width, whereas this study retains the user's broader practice-width range.
 
-## Shared geometry and ABI 5
+## Shared geometry and ABI 6
 
 Venue feature X/Z values are lateral offset and downstream centreline arc length. Boat snapshots remain world X/Z and world yaw. Rust maps and projects course coordinates, rotates water velocities into world coordinates, and applies the bend metric to surface gradients. +Z remains the initial downstream direction; the return leg naturally flows toward world −Z. React reports progress by projection rather than world Z.
 
@@ -45,3 +45,30 @@ Contacts project a densely sampled capsule spine against banks with a 0.025 m co
 Native tests exercise spline mapping roundtrips and folded-route rejection, rectangular faces/corners at multiple headings and a fast impact, alongside existing circle/wall regressions. Actual-WASM tests load Paris content, inspect six reverse eddies, compare course-grid/scalar samples at their mapped positions, reject invalid geometry atomically and run a 150-second deterministic controller replay through the bend and return leg while checking capsule/baffle clearance. Additional WASM checks establish flat elevated/low pools, localized stationary crest envelopes, world-space surface gradients, invalid drop rejection and pole clearance across multiple wave phases. This controller is a test input source, not a gameplay assist.
 
 `pnpm check`, Cargo formatting and Clippy remain required. E2E/Playwright is paused. Interactive checks and their limitations are recorded in the development validation note. Passing deterministic tests does not establish realistic paddling feel, exact Paris hydraulics or target-GPU performance.
+
+
+## Modular baffles and water presentation
+
+Eleven 5.8 m × 1.2 m baffles extend 0.1 m into the nominal bank and leave a
+central passage. Each assembly is rendered as four joined moulded plastic boxes;
+one shared OBB represents their filled rectangular footprint, avoiding artificial
+collision seams. Solid footprints have zero sampled current. Placement avoids the
+expanded eddy pockets; their reverse current remains usable.
+
+Three smaller submerged shapers at 54, 146 and 254 m alter current and generate
+standing wakes, while allowing the planar hull to pass above. Their visual caps
+sit below the base surface; the opaque water does not expose their full geometry.
+This categorical clearance assumption is not a depth-dependent hull/bed solver.
+
+Drop heights total 4.5 m with the first 0.9 m drop over 2.5 m. Standing crest gain
+is 0.72 times drop height (roughly 0.65 m at the first crest), with localized jets.
+Procedural foam uses two crossfaded advection phases to avoid indefinite stretching
+in spatially varying flow. Fine normal variation, Fresnel sky color, sun glints,
+foam flakes and ballistic spray improve whitewater presentation. Spray and fine
+shading do not exert forces; the hydraulic field is empirical, not CFD. Reflections
+use a procedural sky approximation, not scene reflections or production water art.
+
+The race camera sits 6.8 m behind and 2.8 m above the boat's sampled surface,
+looking forward 7 m plus velocity anticipation. Exponential smoothing preserves
+heading continuity across ±π. This reproduces the closer scale and forward view
+of the supplied game references while retaining the venue overview.

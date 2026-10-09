@@ -3,6 +3,7 @@ use crate::collision::{HALF_SEGMENT, HULL_RADIUS};
 pub const MAX_FEATURES: usize = 16;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Obstacle {
+    pub submerged: bool,
     pub width: f64,
     pub length: f64,
     pub yaw: f64,
@@ -224,9 +225,10 @@ impl Venue {
             if ![o.x, o.z, o.radius, o.width, o.length, o.yaw]
                 .iter()
                 .all(|v| v.is_finite())
-                || !(0.4..=3.0).contains(&o.radius)
-                || o.x - o.radius < self.min_x + 0.5
-                || o.x + o.radius > self.max_x - 0.5
+                || !(0.4..=3.5).contains(&o.radius)
+                || (o.submerged && o.width == 0.0)
+                || o.x - extent_x_box(o) < self.min_x - if o.width > 0.0 { 0.25 } else { -0.5 }
+                || o.x + extent_x_box(o) > self.max_x + if o.width > 0.0 { 0.25 } else { -0.5 }
                 || o.z - o.radius < self.flow_start + self.flow_ramp
                 || o.z + o.radius > self.max_z - 3.0
             {
@@ -344,7 +346,7 @@ impl Venue {
             let dx = x - o.x;
             let dz = z - o.z;
             let d2 = (dx * dx + dz * dz).max(o.radius * o.radius);
-            let influence = o.radius * o.radius / d2;
+            let influence = o.radius * o.radius / d2 * if o.submerged { 0.35 } else { 1.0 };
             let speed = self.current_speed * ramp;
             vx += -2.0 * speed * influence * dx * dz / d2;
             vz += speed * influence * (dx * dx - dz * dz) / d2;
@@ -363,6 +365,20 @@ impl Venue {
             vx += (r.velocity_x - dz * r.swirl - vx) * blend;
             vz += (r.velocity_z + dx * r.swirl - vz) * blend;
             turbulence = turbulence.max(blend * (1.0 - blend) * 4.0);
+        }
+        // Solid baffles displace the flow; submerged shapers retain over-top current.
+        for o in &self.obstacles[..self.obstacle_count] {
+            if o.width > 0.0 && !o.submerged {
+                let (sn, cs) = o.yaw.sin_cos();
+                let dx = x - o.x;
+                let dz = z - o.z;
+                if (dx * cs - dz * sn).abs() < o.width / 2.0
+                    && (dx * sn + dz * cs).abs() < o.length / 2.0
+                {
+                    vx = 0.0;
+                    vz = 0.0;
+                }
+            }
         }
         if self.drop_count > 0 {
             return self.whitewater_sample(x, z, time, vx, vz, turbulence);
@@ -551,6 +567,19 @@ impl Venue {
             turbulence = turbulence.max(wake * 0.8);
             strength = strength.max(crest);
         }
+        for o in &self.obstacles[..self.obstacle_count] {
+            let (sn, cs) = o.yaw.sin_cos();
+            let dx = x - o.x;
+            let dz = z - o.z;
+            if o.width > 0.0
+                && !o.submerged
+                && (dx * cs - dz * sn).abs() < o.width / 2.0
+                && (dx * sn + dz * cs).abs() < o.length / 2.0
+            {
+                vx = 0.0;
+                vz = 0.0;
+            }
+        }
         let ceiling = self.base_height(self.min_z);
         let height = (self.base_height(z) + elevation * finish).clamp(0.0, ceiling);
         let active = height > 0.0 && height < ceiling;
@@ -594,5 +623,13 @@ impl Venue {
             self.base_height(progress)
                 + self.wave_amplitude * 1.3 * smooth((progress - self.wave_start) / 8.0)
         }
+    }
+}
+
+fn extent_x_box(o: &Obstacle) -> f64 {
+    if o.width > 0.0 {
+        o.width * 0.5 * o.yaw.cos().abs() + o.length * 0.5 * o.yaw.sin().abs()
+    } else {
+        o.radius
     }
 }

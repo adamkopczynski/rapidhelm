@@ -119,6 +119,9 @@ pub fn resolve(state: &mut BoatState, config: BoatConfig, venue: &Venue) -> bool
             }
         }
         for o in &venue.obstacles[..venue.obstacle_count] {
+            if o.submerged {
+                continue;
+            }
             let (ox, oz, oyaw) = venue.frame(o.x, o.z);
             if o.width > 0.0 {
                 let (sin, cos) = state.yaw.sin_cos();

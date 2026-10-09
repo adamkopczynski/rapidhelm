@@ -7,6 +7,7 @@ import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
 import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder';
 import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder';
+import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
 import { CreateDisc } from '@babylonjs/core/Meshes/Builders/discBuilder';
 import { CreateLines } from '@babylonjs/core/Meshes/Builders/linesBuilder';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
@@ -81,12 +82,19 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
   const baffleTop=material('baffle blue cap',new Color3(0.09,0.57,0.87));
   for (const o of venue.obstacles) {
     const y=height(o.x,o.z);
-    const block=o.width ? CreateBox(o.id,{width:o.width,depth:o.length,height:1.35},scene) : CreateCylinder(o.id,{diameter:o.radius*2,height:1.35,tessellation:12},scene);
-    place(block,o.x,o.z,y+0.1);block.rotation.y+=o.yaw??0;block.material=baffleMat;
-    const cap=CreateBox('baffle cap',{width:o.width??o.radius*1.3,depth:o.length??o.radius*1.3,height:0.08},scene);
-    place(cap,o.x,o.z,y+0.815);cap.rotation.y+=o.yaw??0;cap.material=baffleTop;
-    if(o.width) for(let rib=0;rib<Math.floor(o.width/0.4);rib++) {
-      const slot=CreateBox('baffle moulding',{width:0.04,height:0.85,depth:0.02},scene);slot.parent=block;slot.position.set(-o.width/2+0.3+rib*0.4,0, -(o.length??1)/2-0.012);slot.material=rockMat;
+    // Joined moulded modules fill one shared physical footprint: seams cannot trap the hull.
+    const modules=o.width ? Math.ceil(o.width/1.5) : 1, moduleWidth=(o.width??o.radius*2)/modules;
+    for(let module=0;module<modules;module++) {
+      const root=new TransformNode(`${o.id} assembly`,scene),f=frame(o.x,o.z);
+      root.position.set(f.x,y+(o.submerged ? -.95 : .1),f.z);root.rotation.y=f.yaw+(o.yaw??0);
+      const block=CreateBox(`${o.id} module ${module}`,{width:moduleWidth,depth:o.length??o.radius*2,height:1.2},scene);
+      block.parent=root;block.position.x=-(o.width??moduleWidth)/2+moduleWidth*(module+.5);block.material=baffleMat;
+      const cap=CreateBox('moulded blue cap',{width:moduleWidth-.025,depth:(o.length??1)-.025,height:.08},scene);
+      cap.parent=block;cap.position.y=.64;cap.material=baffleTop;
+      for(let rib=0;rib<3;rib++) {
+        const mould=CreateBox('module reinforcement',{width:.055,height:.94,depth:.065},scene);
+        mould.parent=block;mould.position.set(-moduleWidth/2+.2+rib*(moduleWidth-.4)/2,0,-(o.length??1)/2);mould.material=baffleTop;
+      }
     }
     const rail=CreateBox('submerged mounting rail',{width:0.12,depth:4,height:0.06},scene);
     place(rail,o.x,o.z,y-0.45);rail.material=rockMat;
@@ -95,7 +103,7 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
   const red=material('upstream gate',new Color3(0.88,0.16,0.12));
   const green=material('downstream gate',new Color3(0.04,0.55,0.28));
   function placeHolder(node:TransformNode,x:number,y:number,z:number,yaw:number){node.position.set(x,y,z);node.rotation.y=yaw;}
-  const gateDiameter=0.045, poleLength=1.8, clearance=0.2;
+  const gateDiameter=0.045, poleLength=1.8, clearance=0.23;
   const hanging: {node:TransformNode;phase:number}[]=[];
   for (const gate of venue.gates) {
     const supports:{x:number;bottom:number}[]=[];
@@ -128,7 +136,7 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
     const texture=new DynamicTexture('gate number '+gate.id,{width:128,height:128},scene,false);
     texture.drawText(String(gate.id),null,90,'bold 76px sans-serif','#162c32','#f0f3e9',true);
     const number=CreatePlane('gate number '+gate.id,{width:0.3,height:0.3},scene);
-    place(number,gate.x,gate.z,cableHeight-0.2);number.billboardMode=Mesh.BILLBOARDMODE_Y;
+    place(number,gate.x,gate.z,cableHeight-0.2);number.billboardMode=Mesh.BILLBOARDMODE_Y;hanging.push({node:number,phase:gate.id*.8});
     const mat=material('number',Color3.White());mat.diffuseTexture=texture;number.material=mat;
   }
   if (venue.geometry) {
@@ -173,6 +181,12 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
     const points = Array.from({ length: 5 }, () => new Vector3());
     const mesh = CreateLines('sampled flow arrow', { points, updatable: true }, scene); mesh.color = new Color3(0.65, 0.93, 0.95); arrows.push({ x, z, points, mesh });
   }
+  const drops=venue.hydraulics?.drops??[];
+  const spray=CreateSphere('breaking crest spray',{diameter:1,segments:4},scene);
+  spray.material=foamMat;
+  const sprayCount=drops.length*36,sprayMatrices=new Float32Array(sprayCount*16);
+  if(sprayCount) spray.thinInstanceSetBuffer('matrix',sprayMatrices,16,false);
+  spray.setBoundingInfo(new BoundingInfo(new Vector3(-20,-10,-5),new Vector3(110,12,180)));
   let lastTime = -1;
   return {
     update(time: number, delta: number, debug: boolean) {
@@ -198,7 +212,7 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
         const metric=sim.channelMetric(f.x,f.z);
         f.z += (vx*sin+vz*cos)*delta/metric;
         if (f.x < sim.channelEdge(-1,f.z)+0.4 || f.x > sim.channelEdge(1,f.z)-0.4 || f.z > b.maxZ - 0.5 || f.z < venue.flow.startZ) { f.x = b.minX + 0.8 + ((i * 0.61803398875) % 1) * (width - 1.6); f.z = venue.flow.startZ + 2; }
-        const hidden = venue.obstacles.some((o) => {if(!o.width) return Math.hypot(f.x-o.x,f.z-o.z)<o.radius;
+        const hidden = venue.obstacles.some((o) => {if(o.submerged)return false;if(!o.width) return Math.hypot(f.x-o.x,f.z-o.z)<o.radius;
           const angle=o.yaw??0,dx=f.x-o.x,dz=f.z-o.z;
           return Math.abs(dx*Math.cos(angle)-dz*Math.sin(angle))<o.width/2+0.15 && Math.abs(dx*Math.sin(angle)+dz*Math.cos(angle))<(o.length??0)/2+0.15;
         });
@@ -208,6 +222,15 @@ export function createVenueScene(scene: Scene, sim: Simulation, venue: RiverVenu
         const world=frame(f.x,f.z);position.set(world.x, gridValue(f.x, f.z, 0) + 0.04, world.z); Matrix.ComposeToRef(scale, rotation, position, matrix); matrix.copyToArray(matrices, i * 16);
       }
       foam.thinInstanceBufferUpdated('matrix');
+      for(let i=0;i<sprayCount;i++) {
+        const d=drops[Math.floor(i/36)],age=(time*1.2+i*.61803398875)%1;
+        const x=(((i*.381966)%1)-.5)*12,z=d.z+d.length+1+age*2.5;
+        const f=frame(x,z),h=gridValue(x,z,0)+4*age*(1-age)*d.height*.8;
+        const size=.018+.025*((i*.73)%1);
+        position.set(f.x,h+.03,f.z);scale.set(size,size*1.4,size);
+        Matrix.ComposeToRef(scale,Quaternion.Identity(),position,matrix);matrix.copyToArray(sprayMatrices,i*16);
+      }
+      if(sprayCount) spray.thinInstanceBufferUpdated('matrix');
       for (const a of arrows) {
         a.mesh.setEnabled(debug); if (!debug) continue;
         const vx = gridValue(a.x, a.z, 1), vz = gridValue(a.x, a.z, 2), magnitude = Math.hypot(vx, vz);

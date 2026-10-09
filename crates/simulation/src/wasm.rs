@@ -14,7 +14,7 @@ thread_local! {
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn abi_version() -> u32 {
-    5
+    6
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn timestep() -> f64 {
@@ -425,12 +425,21 @@ pub extern "C" fn venue_drop(z: f64, height: f64, length: f64) -> u32 {
     })
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn venue_block(x: f64, z: f64, width: f64, length: f64, yaw: f64) -> u32 {
+pub extern "C" fn venue_block(
+    x: f64,
+    z: f64,
+    width: f64,
+    length: f64,
+    yaw: f64,
+    submerged: u32,
+) -> u32 {
     STAGED.with_borrow_mut(|s| {
         if let Some(v) = s
             && v.obstacle_count < MAX_FEATURES
+            && submerged <= 1
         {
             v.obstacles[v.obstacle_count] = Obstacle {
+                submerged: submerged == 1,
                 x,
                 z,
                 width,

@@ -19,16 +19,19 @@ export function createRiverMaterial(scene: Scene) {
         return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
       float fbm(vec2 q){return .55*noise(q)+.28*noise(q*2.07)+.17*noise(q*4.13);}
       void main(){
-        vec2 uv=p.xz-flow.yz*time*.65;
-        float fine=fbm(uv*5.);
-        vec2 ripple=vec2(noise(uv*9.),noise(uv*9.+17.))-.5;
+        // Crossfade two bounded advection phases; variable current cannot stretch
+        // the noise indefinitely as simulation time grows.
+        float phase=fract(time/6.),other=fract(phase+.5),blend=abs(phase*2.-1.);
+        vec2 uv=p.xz-flow.yz*phase*3.9,uv2=p.xz-flow.yz*other*3.9;
+        float fine=mix(fbm(uv*4.),fbm(uv2*4.),blend);
+        vec2 ripple=mix(vec2(noise(uv*7.),noise(uv*7.+17.)),vec2(noise(uv2*7.),noise(uv2*7.+17.)),blend)-.5;
         vec3 normal=normalize(n+vec3(ripple.x,0.,ripple.y)*(.09+flow.x*.32));
         vec3 view=normalize(eye-p);float fresnel=pow(1.-max(dot(normal,view),0.),4.);
         vec3 sky=mix(vec3(.40,.61,.67),vec3(.78,.88,.90),max(reflect(-view,normal).y,0.));
         vec3 water=mix(vec3(.055,.19,.155),sky,.12+.72*fresnel);
         float sun=pow(max(dot(normal,normalize(view+vec3(-.35,.85,.4))),0.),180.);
         water+=vec3(1.,.94,.78)*sun*.85;
-        float lace=fbm(uv*1.8+vec2(fine*.8));
+        float lace=mix(fbm(uv*1.8+vec2(fine*.8)),fbm(uv2*1.8+vec2(fine*.8)),blend);
         float coverage=clamp(flow.x*.84+flow.w*.75,0.,.94);
         float foam=smoothstep(1.-coverage-.12,1.-coverage+.10,lace);
         vec3 froth=mix(vec3(.62,.77,.72),vec3(.96,.99,.96),fine);

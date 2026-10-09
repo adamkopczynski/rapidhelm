@@ -17,7 +17,7 @@ export type BoatConfig = z.infer<typeof boatConfigSchema>;
 export const boatPresetSchema = z.object({ version: z.literal(1), id: z.string().min(1), name: z.string().min(1), config: boatConfigSchema });
 
 const finite = () => z.number().finite();
-const obstacleSchema = z.object({ id: z.string().min(1), x: finite(), z: finite(), radius: finite().min(0.4).max(3), width:finite().min(0.6).max(6).optional(),length:finite().min(0.4).max(3).optional(),yaw:finite().optional() });
+const obstacleSchema = z.object({ id: z.string().min(1), x: finite(), z: finite(), radius: finite().min(0.4).max(3.5), width:finite().min(0.6).max(6).optional(),length:finite().min(0.4).max(3).optional(),yaw:finite().optional(),submerged:z.boolean().optional() });
 const flowRegionSchema = z.object({ id: z.string().min(1), x: finite(), z: finite(), radiusX: finite().min(1).max(10), radiusZ: finite().min(2).max(30), velocityX: finite().min(-5).max(5), velocityZ: finite().min(-5).max(5), swirl: finite().min(-3).max(3) });
 export const riverVenueSchema = z.object({
   version: z.literal(2), id: z.string().min(1), name: z.string().min(1),
@@ -52,8 +52,11 @@ export const riverVenueSchema = z.object({
   const ids = [...v.obstacles, ...v.regions].map((item) => item.id);
   if (new Set(ids).size !== ids.length) fail('Feature IDs must be unique');
   v.obstacles.forEach((o, index) => {
-    if (o.x - o.radius < b.minX + 0.5 || o.x + o.radius > b.maxX - 0.5 || o.z - o.radius < f.startZ + f.rampLength || o.z + o.radius > b.maxZ - 3) fail('Obstacle outside the downstream channel');
+    const extent=o.width ? o.width/2*Math.abs(Math.cos(o.yaw??0))+(o.length??0)/2*Math.abs(Math.sin(o.yaw??0)) : o.radius;
+    const margin=o.width ? -0.25 : 0.5;
+    if (o.x - extent < b.minX + margin || o.x + extent > b.maxX - margin || o.z - o.radius < f.startZ + f.rampLength || o.z + o.radius > b.maxZ - 3) fail('Obstacle outside the downstream channel');
     if(o.width && (!o.length || o.radius+1e-9<Math.hypot(o.width/2,o.length/2))) fail('Block footprint must fit its bounding radius');
+    if(o.submerged && !o.width) fail('Submerged shapers require a block footprint');
     if(!o.width && (o.length!==undefined || o.yaw!==undefined)) fail('Incomplete block footprint');
     for (const other of v.obstacles.slice(0, index)) if (Math.hypot(o.x - other.x, o.z - other.z) < o.radius + other.radius + 3.8) fail('Obstacles need hull clearance');
   });

@@ -2,7 +2,7 @@ export interface BoatState { x: number; z: number; yaw: number; velocityX: numbe
 export interface Snapshots { current: BoatState; previous: BoatState }
 export interface SimulationConfig { mass: number; yawInertia: number; forwardThrust: number; reverseThrust: number; steeringTorque: number; forwardDrag: number; lateralDrag: number; angularDamping: number }
 export const STATE_INDEX = { x: 0, z: 1, yaw: 2, velocityX: 3, velocityZ: 4, yawRate: 5 } as const;
-export const ABI_VERSION = 5;
+export const ABI_VERSION = 6;
 export interface VenueConfig {
   geometry?: { centerline?:readonly {x:number;z:number}[]; pools?:{startWidth:number;finishWidth:number;length:number}; bendRadius: number; pockets: readonly { z:number; length:number; expansion:number; side:number }[] };
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -10,7 +10,7 @@ export interface VenueConfig {
   flow: { speed: number; startZ: number; rampLength: number };
   water: { waveStartZ: number; amplitude: number; wavelength: number; frequency: number; slope: number; depth: number };
   hydraulics?:{ drops:readonly {z:number;height:number;length:number}[] };
-  obstacles: readonly { x: number; z: number; radius: number; width?:number;length?:number;yaw?:number }[];
+  obstacles: readonly { x: number; z: number; radius: number; width?:number;length?:number;yaw?:number;submerged?:boolean }[];
   regions: readonly { x: number; z: number; radiusX: number; radiusZ: number; velocityX: number; velocityZ: number; swirl: number }[];
 }
 export interface WaterSample { velocityX: number; velocityZ: number; height: number; gradientX: number; gradientZ: number; waveStrength: number; turbulence: number; depth: number }
@@ -37,7 +37,7 @@ export function bindSimulation(exports: WebAssembly.Exports) {
       if(v.geometry?.centerline) for(const p of v.geometry.centerline) check(api.venue_point(p.x,p.z));
       if(v.geometry?.pools) {const p=v.geometry.pools;check(api.venue_pools(p.startWidth,p.finishWidth,p.length));}
       if(v.hydraulics) for(const d of v.hydraulics.drops) check(api.venue_drop(d.z,d.height,d.length));
-      for (const o of v.obstacles) check(o.width ? api.venue_block(o.x,o.z,o.width,o.length??0,o.yaw??0) : api.venue_obstacle(o.x, o.z, o.radius));
+      for (const o of v.obstacles) check(o.width ? api.venue_block(o.x,o.z,o.width,o.length??0,o.yaw??0,o.submerged ? 1 : 0) : api.venue_obstacle(o.x, o.z, o.radius));
       for (const r of v.regions) check(api.venue_region(r.x, r.z, r.radiusX, r.radiusZ, r.velocityX, r.velocityZ, r.swirl));
       check(api.venue_commit()); return read();
     },
