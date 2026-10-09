@@ -241,3 +241,70 @@ fn invalid_venue_is_atomic_and_reset_returns_to_start() {
     assert_eq!(s.contacts, 0);
     assert_eq!(s.previous, s.state);
 }
+
+fn paris_geometry() -> Venue {
+    Venue {
+        min_x: -7.0,
+        max_x: 7.0,
+        max_z: 300.0,
+        bend_radius: 30.0,
+        slope: 4.5 / 277.0,
+        ..Venue::default()
+    }
+}
+#[test]
+fn curved_map_roundtrips_and_rotates_flow() {
+    let v = paris_geometry();
+    assert!(v.valid());
+    for progress in [0.0, 55.0, 103.0, 125.0, 150.0, 180.0, 210.0, 299.0] {
+        for offset in [-7.0, 0.0, 7.0] {
+            let (x, z, yaw) = v.frame(offset, progress);
+            let (a, b) = v.project(x, z);
+            assert!((a - offset).abs() < 1e-9 && (b - progress).abs() < 1e-9);
+            let w = v.sample(x, z, 3.0);
+            // Far from authored eddies, flow follows the tangent even on return leg.
+            assert!((w.velocity_x * yaw.cos() - w.velocity_z * yaw.sin()).abs() < 1e-9);
+        }
+    }
+    assert!((v.base_height(300.0) + 4.5).abs() < 1e-10);
+    let (x, z, _) = v.frame(2.0, 150.0);
+    let w = v.sample(x, z, 3.0);
+    let eps = 1e-5;
+    assert!(
+        ((v.sample(x + eps, z, 3.0).height - v.sample(x - eps, z, 3.0).height) / (2.0 * eps)
+            - w.gradient_x)
+            .abs()
+            < 1e-6
+    );
+    assert!(
+        ((v.sample(x, z + eps, 3.0).height - v.sample(x, z - eps, 3.0).height) / (2.0 * eps)
+            - w.gradient_z)
+            .abs()
+            < 1e-6
+    );
+}
+#[test]
+fn curved_capsule_contacts_hold_at_every_heading() {
+    let v = paris_geometry();
+    for progress in [5.0, 100.0, 120.0, 150.0, 180.0, 205.0, 295.0] {
+        for heading in 0..32 {
+            let (x, z, _) = v.frame(6.9, progress);
+            let mut state = BoatState {
+                x,
+                z,
+                yaw: f64::from(heading) * std::f64::consts::TAU / 32.0,
+                ..BoatState::default()
+            };
+            crate::collision::resolve(&mut state, BoatConfig::default(), &v);
+            for i in 0..=100 {
+                let d = HALF_SEGMENT * (f64::from(i) / 50.0 - 1.0);
+                let (a, b) =
+                    v.project(state.x + d * state.yaw.sin(), state.z + d * state.yaw.cos());
+                assert!(
+                    a.abs() + HULL_RADIUS <= 7.0 + 1e-6,
+                    "{progress} {heading} {a} {b}"
+                );
+            }
+        }
+    }
+}

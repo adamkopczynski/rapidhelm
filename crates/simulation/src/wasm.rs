@@ -1,7 +1,7 @@
 use crate::{
     boat::BoatConfig,
     physics::{DT, Simulation},
-    river::{FlowRegion, MAX_FEATURES, Obstacle, Venue, WaterSample},
+    river::{FlowRegion, MAX_FEATURES, Obstacle, Pocket, Venue, WaterSample},
 };
 use std::cell::RefCell;
 const MAX_GRID: usize = 4096;
@@ -9,11 +9,12 @@ thread_local! {
     static SIM: RefCell<Simulation> = RefCell::new(Simulation::default());
     static STAGED: RefCell<Option<Venue>> = const { RefCell::new(None) };
     static SAMPLE: RefCell<[f64; 8]> = const { RefCell::new([0.0; 8]) };
+    static FRAME: RefCell<[f64; 3]> = const { RefCell::new([0.0;3]) };
     static GRID: RefCell<[f32; MAX_GRID * 5]> = const { RefCell::new([0.0; MAX_GRID * 5]) };
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn abi_version() -> u32 {
-    3
+    4
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn timestep() -> f64 {
@@ -244,4 +245,116 @@ pub extern "C" fn water_grid(
             grid.as_mut_ptr() as usize as u32
         })
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn venue_geometry(radius: f64) -> u32 {
+    STAGED.with_borrow_mut(|staged| {
+        if let Some(v) = staged {
+            v.bend_radius = radius;
+            if v.valid() {
+                return 1;
+            }
+        }
+        *staged = None;
+        0
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn venue_pocket(z: f64, length: f64, expansion: f64, side: f64) -> u32 {
+    STAGED.with_borrow_mut(|staged| {
+        if let Some(v) = staged
+            && v.pocket_count < MAX_FEATURES
+        {
+            v.pockets[v.pocket_count] = Pocket {
+                z,
+                length,
+                expansion,
+                side,
+            };
+            v.pocket_count += 1;
+            if v.valid() {
+                return 1;
+            }
+        }
+        *staged = None;
+        0
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn channel_frame(x: f64, z: f64, project: u32) -> u32 {
+    if ![x, z].iter().all(|v| v.is_finite()) {
+        return 0;
+    }
+    SIM.with_borrow(|sim| {
+        FRAME.with_borrow_mut(|frame| {
+            let Some(v) = sim.venue else {
+                return 0;
+            };
+            let (a, b, c) = if project == 0 {
+                v.frame(x, z)
+            } else {
+                let (a, b) = v.project(x, z);
+                (a, b, v.frame(a, b).2)
+            };
+            *frame = [a, b, c];
+            frame.as_mut_ptr() as usize as u32
+        })
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn course_grid(
+    nx: u32,
+    nz: u32,
+    origin_x: f64,
+    origin_z: f64,
+    dx: f64,
+    dz: f64,
+    time: f64,
+) -> u32 {
+    let Some(count) = nx.checked_mul(nz) else {
+        return 0;
+    };
+    if count == 0
+        || count as usize > MAX_GRID
+        || ![origin_x, origin_z, dx, dz, time]
+            .iter()
+            .all(|v| v.is_finite())
+    {
+        return 0;
+    }
+    SIM.with_borrow(|sim| {
+        GRID.with_borrow_mut(|grid| {
+            let Some(v) = sim.venue else {
+                return 0;
+            };
+            for row in 0..nz {
+                for col in 0..nx {
+                    let progress = origin_z + f64::from(row) * dz;
+                    // Grid X is normalized across the pocket-expanded channel.
+                    let t = (origin_x + f64::from(col) * dx - v.min_x) / (v.max_x - v.min_x);
+                    let offset = v.edge(-1.0, progress) * (1.0 - t) + v.edge(1.0, progress) * t;
+                    let (x, z, _) = v.frame(offset, progress);
+                    let w = v.sample(x, z, time);
+                    let i = ((row * nx + col) * 5) as usize;
+                    grid[i] = w.height as f32;
+                    grid[i + 1] = w.velocity_x as f32;
+                    grid[i + 2] = w.velocity_z as f32;
+                    grid[i + 3] = w.gradient_x as f32;
+                    grid[i + 4] = w.gradient_z as f32;
+                }
+            }
+            grid.as_mut_ptr() as usize as u32
+        })
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn channel_edge(side: f64, progress: f64) -> f64 {
+    SIM.with_borrow(|s| s.venue.map_or(f64::NAN, |v| v.edge(side, progress)))
+}
+
+/// Static concrete follows the base grade, never a particular wave phase.
+#[unsafe(no_mangle)]
+pub extern "C" fn channel_base_height(progress: f64) -> f64 {
+    SIM.with_borrow(|s| s.venue.map_or(f64::NAN, |v| v.base_height(progress)))
 }

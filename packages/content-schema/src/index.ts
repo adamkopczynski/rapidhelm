@@ -21,6 +21,9 @@ const obstacleSchema = z.object({ id: z.string().min(1), x: finite(), z: finite(
 const flowRegionSchema = z.object({ id: z.string().min(1), x: finite(), z: finite(), radiusX: finite().min(1).max(10), radiusZ: finite().min(2).max(30), velocityX: finite().min(-5).max(5), velocityZ: finite().min(-5).max(5), swirl: finite().min(-3).max(3) });
 export const riverVenueSchema = z.object({
   version: z.literal(2), id: z.string().min(1), name: z.string().min(1),
+  geometry: z.object({ bendRadius: finite().min(24).max(80), pockets: z.array(z.object({z:finite(),length:finite().min(4).max(14),expansion:finite().min(0).max(3),side:z.union([z.literal(-1),z.literal(1)])})).max(16) }).optional(),
+  metadata: z.object({ competitionLength:finite().positive(), nominalWidth:finite().positive(), drop:finite().positive(), discharge:finite().positive(), trainingLength:finite().positive(), trainingDischarge:finite().positive(), regattaLength:finite().positive(), spectators:z.number().int().positive() }).optional(),
+  gates: z.array(z.object({id:z.number().int().min(1),x:finite(),z:finite(),width:finite().min(2).max(6),direction:z.enum(['upstream','downstream'])})).max(25).default([]),
   bounds: z.object({ minX: finite(), maxX: finite(), minZ: finite(), maxZ: finite() }),
   start: z.object({ x: finite(), z: finite(), yaw: finite() }),
   flow: z.object({ speed: finite().min(0).max(8), startZ: finite(), rampLength: finite().min(2).max(100) }),
@@ -33,6 +36,13 @@ export const riverVenueSchema = z.object({
   if (f.startZ < b.minZ + 5 || f.startZ + f.rampLength > b.maxZ || w.waveStartZ < f.startZ + f.rampLength || w.waveStartZ > b.maxZ - 5) fail('Flow and waves must follow the calm pool inside the venue');
   const ex = 0.42 + 1.48 * Math.abs(Math.sin(v.start.yaw)), ez = 0.42 + 1.48 * Math.abs(Math.cos(v.start.yaw));
   if (v.start.x - ex < b.minX || v.start.x + ex > b.maxX || v.start.z - ez < b.minZ || v.start.z + ez >= f.startZ) fail('Start must fit the full hull in the calm pool');
+  if (v.geometry) {
+    const g=v.geometry;
+    if (b.minZ!==0 || b.minX!==-b.maxX || b.maxX>g.bendRadius*0.3 || b.maxZ<Math.PI*g.bendRadius+40) fail('Invalid curved channel');
+    for (const p of g.pockets) if (p.z-p.length<f.startZ+f.rampLength || p.z+p.length>b.maxZ-3) fail('Pocket outside flowing channel');
+  }
+  if (new Set(v.gates.map(g=>g.id)).size!==v.gates.length) fail('Gate IDs must be unique');
+  for (const g of v.gates) if (g.x-g.width/2<b.minX || g.x+g.width/2>b.maxX || g.z<f.startZ+f.rampLength || g.z>b.maxZ-3) fail('Gate outside course');
   const ids = [...v.obstacles, ...v.regions].map((item) => item.id);
   if (new Set(ids).size !== ids.length) fail('Feature IDs must be unique');
   v.obstacles.forEach((o, index) => {

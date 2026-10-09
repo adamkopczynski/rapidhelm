@@ -98,10 +98,11 @@ impl Simulation {
     }
     pub fn reset(&mut self) {
         self.state = if let Some(v) = self.venue {
+            let (x, z, yaw) = v.frame(v.start_x, v.start_z);
             BoatState {
-                x: v.start_x,
-                z: v.start_z,
-                yaw: v.start_yaw,
+                x,
+                z,
+                yaw: yaw + v.start_yaw,
                 ..BoatState::default()
             }
         } else {

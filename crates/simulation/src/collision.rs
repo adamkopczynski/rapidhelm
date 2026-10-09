@@ -45,30 +45,77 @@ pub fn resolve(state: &mut BoatState, config: BoatConfig, venue: &Venue) -> bool
     let mut contacted = false;
     for _ in 0..8 {
         let mut corrected = false;
-        let extent_x = HULL_RADIUS + HALF_SEGMENT * state.yaw.sin().abs();
-        let extent_z = HULL_RADIUS + HALF_SEGMENT * state.yaw.cos().abs();
-        if state.x < venue.min_x + extent_x {
-            state.x = venue.min_x + extent_x;
-            wall(state, config, 1.0, 0.0);
-            corrected = true;
-        }
-        if state.x > venue.max_x - extent_x {
-            state.x = venue.max_x - extent_x;
-            wall(state, config, -1.0, 0.0);
-            corrected = true;
-        }
-        if state.z < venue.min_z + extent_z {
-            state.z = venue.min_z + extent_z;
-            wall(state, config, 0.0, 1.0);
-            corrected = true;
-        }
-        if state.z > venue.max_z - extent_z {
-            state.z = venue.max_z - extent_z;
-            wall(state, config, 0.0, -1.0);
-            corrected = true;
+        if venue.bend_radius == 0.0 && venue.pocket_count == 0 {
+            let extent_x = HULL_RADIUS + HALF_SEGMENT * state.yaw.sin().abs();
+            let extent_z = HULL_RADIUS + HALF_SEGMENT * state.yaw.cos().abs();
+            if state.x < venue.min_x + extent_x {
+                state.x = venue.min_x + extent_x;
+                wall(state, config, 1.0, 0.0);
+                corrected = true;
+            }
+            if state.x > venue.max_x - extent_x {
+                state.x = venue.max_x - extent_x;
+                wall(state, config, -1.0, 0.0);
+                corrected = true;
+            }
+            if state.z < venue.min_z + extent_z {
+                state.z = venue.min_z + extent_z;
+                wall(state, config, 0.0, 1.0);
+                corrected = true;
+            }
+            if state.z > venue.max_z - extent_z {
+                state.z = venue.max_z - extent_z;
+                wall(state, config, 0.0, -1.0);
+                corrected = true;
+            }
+        } else {
+            // Sample the capsule spine at <= 0.185 m. Curvature allowance bounds
+            // the intervening arc; substepping prevents crossing a bank unnoticed.
+            let (sin, cos) = state.yaw.sin_cos();
+            for i in 0..=16 {
+                let d = HALF_SEGMENT * (f64::from(i) / 8.0 - 1.0);
+                let px = state.x + d * sin;
+                let pz = state.z + d * cos;
+                let (offset, progress) = venue.project(px, pz);
+                let (_, _, yaw) = venue.frame(offset, progress);
+                let (ts, tc) = yaw.sin_cos();
+                for side in [-1.0, 1.0] {
+                    let edge = venue.edge(side, progress);
+                    let penetration = side * (offset - edge) + HULL_RADIUS + 0.025;
+                    if penetration > 0.0 {
+                        let derivative = (venue.edge(side, progress + 0.01)
+                            - venue.edge(side, progress - 0.01))
+                            / 0.02;
+                        let norm = (1.0 + derivative * derivative).sqrt();
+                        let nx = side * (-tc + derivative * ts) / norm;
+                        let nz = side * (ts + derivative * tc) / norm;
+                        state.x += nx * penetration / norm;
+                        state.z += nz * penetration / norm;
+                        impulse(
+                            state,
+                            config,
+                            nx,
+                            nz,
+                            d * sin - nx * HULL_RADIUS,
+                            d * cos - nz * HULL_RADIUS,
+                        );
+                        corrected = true;
+                    }
+                }
+                for (limit, dir) in [(venue.min_z, 1.0), (venue.max_z, -1.0)] {
+                    let penetration = dir * (limit - progress) + HULL_RADIUS;
+                    if penetration > 0.0 {
+                        state.x += dir * ts * penetration;
+                        state.z += dir * tc * penetration;
+                        impulse(state, config, dir * ts, dir * tc, d * sin, d * cos);
+                        corrected = true;
+                    }
+                }
+            }
         }
         for o in &venue.obstacles[..venue.obstacle_count] {
-            let (distance, dx, dz) = clearance(*state, o.x, o.z);
+            let (ox, oz, _) = venue.frame(o.x, o.z);
+            let (distance, dx, dz) = clearance(*state, ox, oz);
             let min_distance = o.radius + HULL_RADIUS;
             if distance >= min_distance {
                 continue;
@@ -78,8 +125,8 @@ pub fn resolve(state: &mut BoatState, config: BoatConfig, venue: &Venue) -> bool
             } else {
                 (state.yaw.cos(), -state.yaw.sin())
             };
-            let contact_x = o.x + dx - nx * HULL_RADIUS;
-            let contact_z = o.z + dz - nz * HULL_RADIUS;
+            let contact_x = ox + dx - nx * HULL_RADIUS;
+            let contact_z = oz + dz - nz * HULL_RADIUS;
             impulse(
                 state,
                 config,

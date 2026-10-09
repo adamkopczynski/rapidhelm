@@ -18,7 +18,27 @@ pub struct FlowRegion {
     pub swirl: f64,
 }
 #[derive(Clone, Copy, Debug)]
+pub struct Pocket {
+    pub z: f64,
+    pub length: f64,
+    pub expansion: f64,
+    pub side: f64,
+}
+impl Default for Pocket {
+    fn default() -> Self {
+        Self {
+            z: 0.0,
+            length: 8.0,
+            expansion: 0.0,
+            side: 1.0,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug)]
 pub struct Venue {
+    pub bend_radius: f64,
+    pub pockets: [Pocket; MAX_FEATURES],
+    pub pocket_count: usize,
     pub min_x: f64,
     pub max_x: f64,
     pub min_z: f64,
@@ -43,6 +63,9 @@ pub struct Venue {
 impl Default for Venue {
     fn default() -> Self {
         Self {
+            bend_radius: 0.0,
+            pockets: [Pocket::default(); MAX_FEATURES],
+            pocket_count: 0,
             min_x: -10.0,
             max_x: 10.0,
             min_z: 0.0,
@@ -69,6 +92,7 @@ impl Default for Venue {
 impl Venue {
     pub fn valid(&self) -> bool {
         let values = [
+            self.bend_radius,
             self.min_x,
             self.max_x,
             self.min_z,
@@ -89,6 +113,7 @@ impl Venue {
         if !values.iter().all(|v| v.is_finite())
             || self.obstacle_count > MAX_FEATURES
             || self.region_count > MAX_FEATURES
+            || self.pocket_count > MAX_FEATURES
         {
             return false;
         }
@@ -115,6 +140,28 @@ impl Venue {
             || !(0.8..=5.0).contains(&self.depth)
         {
             return false;
+        }
+        if self.bend_radius != 0.0
+            && (!(24.0..=80.0).contains(&self.bend_radius)
+                || self.max_z - self.min_z < std::f64::consts::PI * self.bend_radius + 40.0
+                || self.min_x != -self.max_x
+                || self.max_x > self.bend_radius * 0.3
+                || self.min_z != 0.0)
+        {
+            return false;
+        }
+        for p in &self.pockets[..self.pocket_count] {
+            if ![p.z, p.length, p.expansion, p.side]
+                .iter()
+                .all(|v| v.is_finite())
+                || !(4.0..=14.0).contains(&p.length)
+                || !(0.0..=3.0).contains(&p.expansion)
+                || p.side.abs() != 1.0
+                || p.z - p.length < self.flow_start + self.flow_ramp
+                || p.z + p.length > self.max_z - 3.0
+            {
+                return false;
+            }
         }
         let extent_x = HULL_RADIUS + HALF_SEGMENT * self.start_yaw.sin().abs();
         let extent_z = HULL_RADIUS + HALF_SEGMENT * self.start_yaw.cos().abs();
@@ -196,6 +243,29 @@ fn smooth_derivative(value: f64) -> f64 {
 }
 impl Venue {
     pub fn sample(&self, x: f64, z: f64, time: f64) -> WaterSample {
+        let (offset, progress) = self.project(x, z);
+        let (_, _, yaw) = self.frame(offset, progress);
+        let mut w = self.local_sample(offset, progress, time);
+        let (sin, cos) = yaw.sin_cos();
+        let metric = if self.bend_radius > 0.0
+            && progress > self.straight_length()
+            && progress < self.max_z - self.straight_length()
+        {
+            1.0 - offset / self.bend_radius
+        } else {
+            1.0
+        };
+        let gx = w.gradient_x;
+        let gz = w.gradient_z / metric;
+        w.gradient_x = gx * cos + gz * sin;
+        w.gradient_z = -gx * sin + gz * cos;
+        let vx = w.velocity_x;
+        let vz = w.velocity_z;
+        w.velocity_x = vx * cos + vz * sin;
+        w.velocity_z = -vx * sin + vz * cos;
+        w
+    }
+    fn local_sample(&self, x: f64, z: f64, time: f64) -> WaterSample {
         let ramp = smooth((z - self.flow_start) / self.flow_ramp);
         let center_x = (self.min_x + self.max_x) * 0.5;
         let bank_distance =
@@ -270,5 +340,55 @@ impl Venue {
     }
     fn base_gradient(&self, z: f64) -> f64 {
         -self.slope * smooth((z - self.flow_start) / self.flow_ramp)
+    }
+}
+
+impl Venue {
+    pub fn straight_length(&self) -> f64 {
+        (self.max_z - std::f64::consts::PI * self.bend_radius) * 0.5
+    }
+    /// Course coordinates are lateral metres and centreline arc-length metres.
+    pub fn frame(&self, offset: f64, progress: f64) -> (f64, f64, f64) {
+        if self.bend_radius == 0.0 {
+            return (offset, progress, 0.0);
+        }
+        let r = self.bend_radius;
+        let l = self.straight_length();
+        let (x, z, yaw) = if progress < l {
+            (0.0, progress, 0.0)
+        } else if progress > self.max_z - l {
+            (2.0 * r, self.max_z - progress, std::f64::consts::PI)
+        } else {
+            let a = (progress - l) / r;
+            (r * (1.0 - a.cos()), l + r * a.sin(), a)
+        };
+        (x + offset * yaw.cos(), z - offset * yaw.sin(), yaw)
+    }
+    pub fn project(&self, x: f64, z: f64) -> (f64, f64) {
+        if self.bend_radius == 0.0 {
+            return (x, z);
+        }
+        let r = self.bend_radius;
+        let l = self.straight_length();
+        if z <= l {
+            if x < r {
+                (x, z)
+            } else {
+                (2.0 * r - x, self.max_z - z)
+            }
+        } else {
+            let a = (z - l).atan2(r - x).clamp(0.0, std::f64::consts::PI);
+            (r - (x - r).hypot(z - l), l + r * a)
+        }
+    }
+    pub fn edge(&self, side: f64, progress: f64) -> f64 {
+        let mut edge = if side < 0.0 { self.min_x } else { self.max_x };
+        for p in &self.pockets[..self.pocket_count] {
+            if p.side == side {
+                let distance = (progress - p.z).abs() / p.length;
+                edge += side * p.expansion * (1.0 - smooth((distance - 0.5) / 0.5));
+            }
+        }
+        edge
     }
 }

@@ -1,0 +1,418 @@
+{
+  "version": 2,
+  "id": "vaires-sur-marne",
+  "name": "Vaires-sur-Marne \u00b7 Paris 2024 study",
+  "bounds": {
+    "minX": -7,
+    "maxX": 7,
+    "minZ": 0,
+    "maxZ": 300
+  },
+  "start": {
+    "x": 0,
+    "z": 5,
+    "yaw": 0
+  },
+  "flow": {
+    "speed": 1.25,
+    "startZ": 14,
+    "rampLength": 18
+  },
+  "water": {
+    "waveStartZ": 34,
+    "amplitude": 0.3,
+    "wavelength": 6.5,
+    "frequency": 1.8,
+    "slope": 0.016245487364620937,
+    "depth": 0.8
+  },
+  "geometry": {
+    "bendRadius": 30,
+    "pockets": [
+      {
+        "z": 48,
+        "length": 10,
+        "expansion": 2.5,
+        "side": 1
+      },
+      {
+        "z": 78,
+        "length": 10,
+        "expansion": 2.5,
+        "side": -1
+      },
+      {
+        "z": 112,
+        "length": 10,
+        "expansion": 2.5,
+        "side": 1
+      },
+      {
+        "z": 158,
+        "length": 10,
+        "expansion": 2.5,
+        "side": -1
+      },
+      {
+        "z": 202,
+        "length": 10,
+        "expansion": 2.5,
+        "side": 1
+      },
+      {
+        "z": 248,
+        "length": 10,
+        "expansion": 2.5,
+        "side": -1
+      }
+    ]
+  },
+  "metadata": {
+    "competitionLength": 300,
+    "nominalWidth": 14,
+    "drop": 4.5,
+    "discharge": 14,
+    "trainingLength": 150,
+    "trainingDischarge": 10,
+    "regattaLength": 2200,
+    "spectators": 12000
+  },
+  "obstacles": [
+    {
+      "id": "rail-baffle-1",
+      "x": 3.5,
+      "z": 38,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-2",
+      "x": -3.5,
+      "z": 60,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-3",
+      "x": 3.5,
+      "z": 88,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-4",
+      "x": -3.5,
+      "z": 102,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-5",
+      "x": 3.5,
+      "z": 128,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-6",
+      "x": -3.5,
+      "z": 145,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-7",
+      "x": 3.5,
+      "z": 172,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-8",
+      "x": -3.5,
+      "z": 188,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-9",
+      "x": 3.5,
+      "z": 216,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-10",
+      "x": -3.5,
+      "z": 232,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-11",
+      "x": 3.5,
+      "z": 262,
+      "radius": 1.3
+    },
+    {
+      "id": "rail-baffle-12",
+      "x": -3.5,
+      "z": 281,
+      "radius": 1.3
+    }
+  ],
+  "regions": [
+    {
+      "id": "eddy-1",
+      "x": 4.8,
+      "z": 48,
+      "radiusX": 2.2,
+      "radiusZ": 7,
+      "velocityX": 0,
+      "velocityZ": -1.4,
+      "swirl": 0.7
+    },
+    {
+      "id": "eddy-2",
+      "x": -4.8,
+      "z": 78,
+      "radiusX": 2.2,
+      "radiusZ": 7,
+      "velocityX": 0,
+      "velocityZ": -1.4,
+      "swirl": -0.7
+    },
+    {
+      "id": "eddy-3",
+      "x": 4.8,
+      "z": 112,
+      "radiusX": 2.2,
+      "radiusZ": 7,
+      "velocityX": 0,
+      "velocityZ": -1.4,
+      "swirl": 0.7
+    },
+    {
+      "id": "eddy-4",
+      "x": -4.8,
+      "z": 158,
+      "radiusX": 2.2,
+      "radiusZ": 7,
+      "velocityX": 0,
+      "velocityZ": -1.4,
+      "swirl": -0.7
+    },
+    {
+      "id": "eddy-5",
+      "x": 4.8,
+      "z": 202,
+      "radiusX": 2.2,
+      "radiusZ": 7,
+      "velocityX": 0,
+      "velocityZ": -1.4,
+      "swirl": 0.7
+    },
+    {
+      "id": "eddy-6",
+      "x": -4.8,
+      "z": 248,
+      "radiusX": 2.2,
+      "radiusZ": 7,
+      "velocityX": 0,
+      "velocityZ": -1.4,
+      "swirl": -0.7
+    },
+    {
+      "id": "jet-1",
+      "x": 0,
+      "z": 43,
+      "radiusX": 2.5,
+      "radiusZ": 4,
+      "velocityX": 0.35,
+      "velocityZ": 3.1,
+      "swirl": 0
+    },
+    {
+      "id": "jet-2",
+      "x": 0,
+      "z": 94,
+      "radiusX": 2.5,
+      "radiusZ": 4,
+      "velocityX": -0.35,
+      "velocityZ": 3.1,
+      "swirl": 0
+    },
+    {
+      "id": "jet-3",
+      "x": 0,
+      "z": 134,
+      "radiusX": 2.5,
+      "radiusZ": 4,
+      "velocityX": 0.35,
+      "velocityZ": 3.1,
+      "swirl": 0
+    },
+    {
+      "id": "jet-4",
+      "x": 0,
+      "z": 178,
+      "radiusX": 2.5,
+      "radiusZ": 4,
+      "velocityX": -0.35,
+      "velocityZ": 3.1,
+      "swirl": 0
+    },
+    {
+      "id": "jet-5",
+      "x": 0,
+      "z": 222,
+      "radiusX": 2.5,
+      "radiusZ": 4,
+      "velocityX": 0.35,
+      "velocityZ": 3.1,
+      "swirl": 0
+    },
+    {
+      "id": "jet-6",
+      "x": 0,
+      "z": 268,
+      "radiusX": 2.5,
+      "radiusZ": 4,
+      "velocityX": -0.35,
+      "velocityZ": 3.1,
+      "swirl": 0
+    }
+  ],
+  "gates": [
+    {
+      "id": 1,
+      "x": 1.8,
+      "z": 35,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 2,
+      "x": 4.5,
+      "z": 48,
+      "width": 3,
+      "direction": "upstream"
+    },
+    {
+      "id": 3,
+      "x": 1.8,
+      "z": 61,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 4,
+      "x": -1.8,
+      "z": 69,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 5,
+      "x": -4.5,
+      "z": 78,
+      "width": 3,
+      "direction": "upstream"
+    },
+    {
+      "id": 6,
+      "x": -1.8,
+      "z": 90,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 7,
+      "x": 1.8,
+      "z": 101,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 8,
+      "x": 4.5,
+      "z": 112,
+      "width": 3,
+      "direction": "upstream"
+    },
+    {
+      "id": 9,
+      "x": 1.8,
+      "z": 125,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 10,
+      "x": -1.8,
+      "z": 137,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 11,
+      "x": 1.8,
+      "z": 145,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 12,
+      "x": -4.5,
+      "z": 158,
+      "width": 3,
+      "direction": "upstream"
+    },
+    {
+      "id": 13,
+      "x": 1.8,
+      "z": 175,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 14,
+      "x": -1.8,
+      "z": 187,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 15,
+      "x": 4.5,
+      "z": 202,
+      "width": 3,
+      "direction": "upstream"
+    },
+    {
+      "id": 16,
+      "x": -1.8,
+      "z": 216,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 17,
+      "x": 1.8,
+      "z": 231,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 18,
+      "x": -4.5,
+      "z": 248,
+      "width": 3,
+      "direction": "upstream"
+    },
+    {
+      "id": 19,
+      "x": 1.8,
+      "z": 265,
+      "width": 3,
+      "direction": "downstream"
+    },
+    {
+      "id": 20,
+      "x": -1.8,
+      "z": 286,
+      "width": 3,
+      "direction": "downstream"
+    }
+  ]
+}

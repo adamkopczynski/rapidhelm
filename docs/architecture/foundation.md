@@ -8,11 +8,11 @@ Rust owns planar position, world velocity, yaw and yaw rate. The renderer never 
 
 ## Coordinate convention
 
-Meters, seconds, radians. +Y is up, +Z is forward/downstream, +X is right. Yaw zero points toward +Z; positive yaw turns toward +X. Babylon uses its default left-handed scene convention. Rust stores planar X/Z and yaw; height and pitch are visual-only.
+Meters, seconds, radians. +Y is up, +Z is the initial forward/downstream direction, +X is right. Curved courses use lateral offset and downstream arc length for authored content, then Rust maps features and rotates currents into world space. Boat snapshots remain world coordinates. Yaw zero points toward +Z; positive yaw turns toward +X. Babylon uses its default left-handed scene convention. Rust stores planar X/Z and yaw; height and pitch are visual-only.
 
 ## WASM interface
 
-The dependency-free crate exports ABI version 3, `timestep()`, `reset()`, `configure(...)`, `advance(steps, throttle, steering)` and `state(index)`. Named state indices 0–5 represent X, Z, yaw, VX, VZ and yaw rate; indices 6–11 contain the penultimate state. The bridge checks ABI/export compatibility and step count bounds; Rust sanitizes controls and rejects invalid configuration atomically. Applying boat configuration resets state, while ordinary reset retains configuration. A staged venue update replaces bounds, spawn, current/wave parameters and obstacles atomically. Both operations preserve the selected venue and reset simulation time/contact counters.
+The dependency-free crate exports ABI version 4, `timestep()`, `reset()`, `configure(...)`, `advance(steps, throttle, steering)` and `state(index)`. Named state indices 0–5 represent X, Z, yaw, VX, VZ and yaw rate; indices 6–11 contain the penultimate state. The bridge checks ABI/export compatibility and step count bounds; Rust sanitizes controls and rejects invalid configuration atomically. Applying boat configuration resets state, while ordinary reset retains configuration. A staged venue update replaces bounds, spawn, current/wave parameters and obstacles atomically. Both operations preserve the selected venue and reset simulation time/contact counters.
 
 The instance is owned by one main-thread runtime with synchronous non-reentrant calls. The TypeScript accumulator uses Rust's exported 1/120 second timestep, clamps long frames to 250 ms and batches up to 30 steps. Rust records the previous state during the batch, so rendering can interpolate without an extra advance call. Continuous yaw avoids heading wrap discontinuities. Hidden tabs stop stepping; blur and editor focus clear held controls and interpolation debt. Catch-up remains bounded. Reproducibility assumes the same per-tick input sequence; wall-clock keyboard sampling across frame rates is not guaranteed identical.
 
@@ -27,3 +27,5 @@ Native Rust tests cover propulsion, anisotropic/angular damping, momentum, confi
 E2E/Playwright runs and its profiler are paused by current session instruction. Interactive verification uses Computer Use; Rust/WASM unit tests remain enabled.
 
 Software WebGL verifies rendering and gives a repeatable baseline; it does not establish target-GPU performance or gameplay quality. See the sprint validation note for outstanding manual checks.
+
+The Paris milestone adds Rust-owned course mapping/projection, pocket-expanded bank edges and a course-grid export. See [Paris venue geometry and limitations](../physics/paris-venue.md). The rectangular world-grid export remains available for regression fixtures.
