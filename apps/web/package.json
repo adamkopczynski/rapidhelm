@@ -1,5 +1,5 @@
 {
-  "name": "@paddleworld/web",
+  "name": "@rapidhelm/web",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,8 +9,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@paddleworld/wasm-bridge": "workspace:*",
-    "@paddleworld/content-schema": "workspace:*",
+    "@rapidhelm/wasm-bridge": "workspace:*",
+    "@rapidhelm/content-schema": "workspace:*",
     "@babylonjs/core": "^8.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

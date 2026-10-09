@@ -23,10 +23,10 @@ importers:
       '@babylonjs/core':
         specifier: ^8.0.0
         version: 8.56.2
-      '@paddleworld/content-schema':
+      '@rapidhelm/content-schema':
         specifier: workspace:*
         version: link:../../packages/content-schema
-      '@paddleworld/wasm-bridge':
+      '@rapidhelm/wasm-bridge':
         specifier: workspace:*
         version: link:../../packages/wasm-bridge
       '@radix-ui/react-slot':

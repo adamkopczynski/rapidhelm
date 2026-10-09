@@ -1,4 +1,4 @@
-# Paddleworld — Canoe Slalom
+# Rapidhelm — Canoe Slalom
 
 Browser-first canoe slalom game. Sprint 0 provides a controllable placeholder kayak in a Babylon.js scene, driven by the real Rust/WASM simulation.
 
@@ -29,7 +29,7 @@ pnpm exec playwright install chromium  # once per machine
 pnpm test:e2e             # browser startup, actual WASM movement, restart
 ```
 
-`pnpm build` produces `apps/web/dist`, including the WASM asset. Preview with `pnpm --filter @paddleworld/web exec vite preview`.
+`pnpm build` produces `apps/web/dist`, including the WASM asset. Preview with `pnpm --filter @rapidhelm/web exec vite preview`.
 
 ## Workspace
 

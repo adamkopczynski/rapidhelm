@@ -9,7 +9,7 @@
         "dist/**"
       ]
     },
-    "@paddleworld/wasm-bridge#build": {
+    "@rapidhelm/wasm-bridge#build": {
       "inputs": [
         "../../crates/simulation/**",
         "../../Cargo.toml",
