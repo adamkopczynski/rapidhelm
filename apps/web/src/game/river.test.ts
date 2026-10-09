@@ -3,6 +3,8 @@ import { expect, test } from 'vitest';
 import { createSimulationFromBytes, type BoatState } from '../../../../packages/wasm-bridge/src/abi';
 import { riverVenueSchema } from '@rapidhelm/content-schema';
 import { trainingVenue as venue } from './venue';
+import { createRuntime } from './runtime';
+import { baseline } from './config';
 const load = async () => createSimulationFromBytes(await readFile(new URL('../../../../packages/wasm-bridge/dist/simulation.wasm', import.meta.url)));
 function assertInside(s: BoatState) {
   const sin = Math.sin(s.yaw), cos = Math.cos(s.yaw), b = venue.bounds;
@@ -42,3 +44,14 @@ test('compiled venue keeps the entire kayak clear through a long control sequenc
   }
   expect(maxZ).toBeGreaterThan(40); expect(sim.contacts()).toBeGreaterThan(0);
 }, 15000);
+
+test('game runtime catches the current, samples waves, and retains the venue through tuning/reset', async () => {
+  const sim = await load(); const runtime = createRuntime(sim, baseline.config, venue);
+  for (let i = 0; i < 60; i++) runtime.update(1 / 60, { throttle: 0, steering: 0 });
+  expect(runtime.read().z).toBe(5); expect(sim.sampleWater(runtime.read().x, runtime.read().z).velocityZ).toBe(0);
+  for (let i = 0; i < 600; i++) runtime.update(1 / 60, { throttle: 1, steering: 0 });
+  const s = runtime.read(); expect(s.z).toBeGreaterThan(40); expect(sim.sampleWater(s.x, s.z).waveStrength).toBeGreaterThan(0.2);
+  runtime.configure({ ...baseline.config, mass: 100 }); expect(runtime.read().z).toBe(5); expect(sim.time()).toBe(0);
+  for (let i = 0; i < 600; i++) runtime.update(1 / 60, { throttle: 1, steering: 0 });
+  expect(runtime.read().z).toBeGreaterThan(40); runtime.reset(); expect(runtime.read().z).toBe(5); expect(sim.contacts()).toBe(0);
+});

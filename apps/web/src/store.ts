@@ -3,9 +3,10 @@ import type { BoatConfig } from '@rapidhelm/content-schema';
 import { baseline } from './game/config';
 export interface Diagnostics {
   forwardSpeed: number; lateralSpeed: number; yawRate: number; heading: number; x: number; z: number;
+  flowX: number; flowZ: number; waveStrength: number; contacts: number;
   steps: number; simulationMs: number; renderMs: number; frameMs: number;
 }
-export const emptyDiagnostics: Diagnostics = { forwardSpeed: 0, lateralSpeed: 0, yawRate: 0, heading: 0, x: 0, z: 0, steps: 0, simulationMs: 0, renderMs: 0, frameMs: 0 };
+export const emptyDiagnostics: Diagnostics = { forwardSpeed: 0, lateralSpeed: 0, yawRate: 0, heading: 0, x: 0, z: 5, flowX: 0, flowZ: 0, waveStrength: 0, contacts: 0, steps: 0, simulationMs: 0, renderMs: 0, frameMs: 0 };
 interface Session {
   status: string; diagnostics: Diagnostics; config: BoatConfig; configRevision: number; resetId: number; debug: boolean;
   restart(): void; applyConfig(config: BoatConfig): void; setDebug(debug: boolean): void;

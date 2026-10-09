@@ -41,4 +41,4 @@ Start `pnpm dev` and evaluate:
 - Actual browser tab/focus loss and return; resize; keyboard focus in tuning fields.
 - A representative run at 1920×1080 with hardware acceleration: record browser, hardware and frame times with debug enabled/disabled.
 
-The placeholder capsule, featureless water, continuous-thrust controls and non-colliding banks are intentional sprint constraints. Accept or tune the handling before opening Sprint 2 river-current work.
+The placeholder capsule, featureless water, continuous-thrust controls and non-colliding banks are intentional sprint constraints. Handling playtesting remains ongoing. The user subsequently authorized continuous implementation across sprint boundaries; river-current work is recorded in river-venue-validation.md.
