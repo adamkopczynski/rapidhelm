@@ -2,20 +2,50 @@ export interface BoatState { x: number; z: number; yaw: number; velocityX: numbe
 export interface Snapshots { current: BoatState; previous: BoatState }
 export interface SimulationConfig { mass: number; yawInertia: number; forwardThrust: number; reverseThrust: number; steeringTorque: number; forwardDrag: number; lateralDrag: number; angularDamping: number }
 export const STATE_INDEX = { x: 0, z: 1, yaw: 2, velocityX: 3, velocityZ: 4, yawRate: 5 } as const;
-export const ABI_VERSION = 2;
-interface SimulationExports { abi_version(): number; timestep(): number; reset(): void; configure(...values: number[]): number; advance(steps: number, throttle: number, steering: number): void; state(index: number): number }
+export const ABI_VERSION = 3;
+export interface VenueConfig {
+  bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+  start: { x: number; z: number; yaw: number };
+  flow: { speed: number; startZ: number; rampLength: number };
+  water: { waveStartZ: number; amplitude: number; wavelength: number; frequency: number; slope: number; depth: number };
+  obstacles: readonly { x: number; z: number; radius: number }[];
+  regions: readonly { x: number; z: number; radiusX: number; radiusZ: number; velocityX: number; velocityZ: number; swirl: number }[];
+}
+export interface WaterSample { velocityX: number; velocityZ: number; height: number; gradientX: number; gradientZ: number; waveStrength: number; turbulence: number; depth: number }
+interface SimulationExports { memory: WebAssembly.Memory; simulation_time(): number; contact_count(): number; venue_begin(...values: number[]): number; venue_obstacle(...values: number[]): number; venue_region(...values: number[]): number; venue_commit(): number; water_sample(x: number, z: number, time: number): number; water_grid(...values: number[]): number; abi_version(): number; timestep(): number; reset(): void; configure(...values: number[]): number; advance(steps: number, throttle: number, steering: number): void; state(index: number): number }
 export function bindSimulation(exports: WebAssembly.Exports) {
-  for (const name of ['abi_version', 'timestep', 'reset', 'configure', 'advance', 'state']) {
-    if (typeof exports[name] !== 'function') throw new Error(`Missing WASM export: ${name}`);
-  }
+  if (typeof exports.abi_version !== 'function') throw new Error('Missing WASM ABI export');
   const api = exports as unknown as SimulationExports;
   if (api.abi_version() !== ABI_VERSION) throw new Error('Incompatible simulation ABI; rebuild WASM and reload.');
+  for (const name of ['timestep', 'reset', 'configure', 'advance', 'state', 'simulation_time', 'contact_count', 'venue_begin', 'venue_obstacle', 'venue_region', 'venue_commit', 'water_sample', 'water_grid']) {
+    if (typeof exports[name] !== 'function') throw new Error(`Missing WASM export: ${name}`);
+  }
+  if (!(api.memory instanceof WebAssembly.Memory)) throw new Error('Missing WASM memory');
   const timestep = api.timestep();
   if (!Number.isFinite(timestep) || timestep <= 0 || timestep > 0.1) throw new Error('Invalid simulation timestep');
   const readState = (offset = 0): BoatState => ({ x: api.state(STATE_INDEX.x + offset), z: api.state(STATE_INDEX.z + offset), yaw: api.state(STATE_INDEX.yaw + offset), velocityX: api.state(STATE_INDEX.velocityX + offset), velocityZ: api.state(STATE_INDEX.velocityZ + offset), yawRate: api.state(STATE_INDEX.yawRate + offset) });
   const read = (): Snapshots => ({ current: readState(), previous: readState(6) });
   return {
-    timestep, read,
+    timestep, read, time: () => api.simulation_time(), contacts: () => api.contact_count(),
+    configureVenue: (v: VenueConfig) => {
+      const b = v.bounds, s = v.start, f = v.flow, w = v.water;
+      const check = (result: number) => { if (result !== 1) throw new Error('Rust rejected venue configuration'); };
+      check(api.venue_begin(b.minX, b.maxX, b.minZ, b.maxZ, s.x, s.z, s.yaw, f.speed, f.startZ, f.rampLength, w.waveStartZ, w.amplitude, w.wavelength, w.frequency, w.slope, w.depth));
+      for (const o of v.obstacles) check(api.venue_obstacle(o.x, o.z, o.radius));
+      for (const r of v.regions) check(api.venue_region(r.x, r.z, r.radiusX, r.radiusZ, r.velocityX, r.velocityZ, r.swirl));
+      check(api.venue_commit()); return read();
+    },
+    sampleWater: (x: number, z: number, time = api.simulation_time()): WaterSample => {
+      const ptr = api.water_sample(x, z, time); if (!ptr) throw new Error('Invalid water sample');
+      const data = new Float64Array(api.memory.buffer, ptr, 8);
+      return { velocityX: data[0], velocityZ: data[1], height: data[2], gradientX: data[3], gradientZ: data[4], waveStrength: data[5], turbulence: data[6], depth: data[7] };
+    },
+    // Borrowed view: overwritten by the next grid call. No per-vertex WASM crossings.
+    waterGrid: (nx: number, nz: number, x: number, z: number, dx: number, dz: number, time = api.simulation_time()) => {
+      if (!Number.isInteger(nx) || !Number.isInteger(nz) || nx <= 0 || nz <= 0 || nx * nz > 4096) throw new Error('Water grid must contain 1..4096 points');
+      const ptr = api.water_grid(nx, nz, x, z, dx, dz, time); if (!ptr) throw new Error('Invalid water grid');
+      return new Float32Array(api.memory.buffer, ptr, nx * nz * 5);
+    },
     reset: () => { api.reset(); return read(); },
     configure: (c: SimulationConfig) => {
       if (api.configure(c.mass, c.yawInertia, c.forwardThrust, c.reverseThrust, c.steeringTorque, c.forwardDrag, c.lateralDrag, c.angularDamping) !== 1) throw new Error('Rust rejected boat configuration');

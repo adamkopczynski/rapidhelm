@@ -1,4 +1,5 @@
 use crate::boat::{BoatConfig, BoatState};
+use crate::{collision, river::Venue};
 pub const DT: f64 = 1.0 / 120.0;
 
 // Exact velocity update for constant force and linear drag during this step.
@@ -26,6 +27,28 @@ pub fn step(
     steering: f64,
     water_velocity: [f64; 2],
 ) {
+    step_forces(
+        state,
+        config,
+        throttle,
+        steering,
+        water_velocity,
+        [0.0, 0.0],
+        0.0,
+        0.0,
+    );
+}
+#[allow(clippy::too_many_arguments)]
+fn step_forces(
+    state: &mut BoatState,
+    config: BoatConfig,
+    throttle: f64,
+    steering: f64,
+    water_velocity: [f64; 2],
+    acceleration: [f64; 2],
+    water_yaw_rate: f64,
+    water_yaw_drag: f64,
+) {
     let throttle = input(throttle);
     let steering = input(steering);
     let (sin, cos) = state.yaw.sin_cos();
@@ -41,12 +64,12 @@ pub fn step(
         };
     let forward = damped_velocity(forward, thrust, config.forward_drag, config.mass);
     let lateral = damped_velocity(lateral, 0.0, config.lateral_drag, config.mass);
-    state.velocity_x = forward * sin + lateral * cos + water_velocity[0];
-    state.velocity_z = forward * cos - lateral * sin + water_velocity[1];
+    state.velocity_x = forward * sin + lateral * cos + water_velocity[0] + acceleration[0] * DT;
+    state.velocity_z = forward * cos - lateral * sin + water_velocity[1] + acceleration[1] * DT;
     state.yaw_rate = damped_velocity(
         state.yaw_rate,
-        steering * config.steering_torque,
-        config.angular_damping,
+        steering * config.steering_torque + water_yaw_rate * water_yaw_drag,
+        config.angular_damping + water_yaw_drag,
         config.yaw_inertia,
     );
     // Integrate position from updated velocities (semi-implicit position integration).
@@ -60,6 +83,9 @@ pub struct Simulation {
     pub state: BoatState,
     pub previous: BoatState,
     pub config: BoatConfig,
+    pub venue: Option<Venue>,
+    pub time: f64,
+    pub contacts: u32,
 }
 impl Simulation {
     pub fn configure(&mut self, config: BoatConfig) -> bool {
@@ -71,13 +97,81 @@ impl Simulation {
         true
     }
     pub fn reset(&mut self) {
-        self.state = BoatState::default();
+        self.state = if let Some(v) = self.venue {
+            BoatState {
+                x: v.start_x,
+                z: v.start_z,
+                yaw: v.start_yaw,
+                ..BoatState::default()
+            }
+        } else {
+            BoatState::default()
+        };
         self.previous = self.state;
+        self.time = 0.0;
+        self.contacts = 0;
+    }
+    pub fn configure_venue(&mut self, venue: Venue) -> bool {
+        if !venue.valid() {
+            return false;
+        }
+        self.venue = Some(venue);
+        self.reset();
+        true
     }
     pub fn advance(&mut self, steps: u32, throttle: f64, steering: f64) {
         for _ in 0..steps.min(30) {
             self.previous = self.state;
-            step(&mut self.state, self.config, throttle, steering, [0.0, 0.0]);
+            if let Some(v) = self.venue {
+                let water = v.sample(self.state.x, self.state.z, self.time);
+                let (sin, cos) = self.state.yaw.sin_cos();
+                let bow = v.sample(
+                    self.state.x + sin * collision::HALF_SEGMENT,
+                    self.state.z + cos * collision::HALF_SEGMENT,
+                    self.time,
+                );
+                let stern = v.sample(
+                    self.state.x - sin * collision::HALF_SEGMENT,
+                    self.state.z - cos * collision::HALF_SEGMENT,
+                    self.time,
+                );
+                let water_yaw_rate = ((bow.velocity_x - stern.velocity_x) * cos
+                    - (bow.velocity_z - stern.velocity_z) * sin)
+                    / (2.0 * collision::HALF_SEGMENT);
+                let yaw_drag = self.config.lateral_drag * collision::HALF_SEGMENT.powi(2) * 0.15;
+                step_forces(
+                    &mut self.state,
+                    self.config,
+                    throttle,
+                    steering,
+                    [water.velocity_x, water.velocity_z],
+                    [-9.81 * water.gradient_x, -9.81 * water.gradient_z],
+                    water_yaw_rate,
+                    yaw_drag,
+                );
+                // Integrate the updated velocities in small pose increments to avoid tunnelling.
+                self.state.x = self.previous.x;
+                self.state.z = self.previous.z;
+                self.state.yaw = self.previous.yaw;
+                let travel = (self.state.velocity_x.hypot(self.state.velocity_z)
+                    + self.state.yaw_rate.abs() * collision::HALF_SEGMENT)
+                    * DT;
+                let segments = (travel / 0.12).ceil().clamp(1.0, 4096.0) as u32;
+                let sub_dt = DT / f64::from(segments);
+                let mut contact = false;
+                for _ in 0..segments {
+                    self.state.x += self.state.velocity_x * sub_dt;
+                    self.state.z += self.state.velocity_z * sub_dt;
+                    self.state.yaw += self.state.yaw_rate * sub_dt;
+                    contact |= collision::resolve(&mut self.state, self.config, &v);
+                }
+                if contact {
+                    self.contacts = self.contacts.saturating_add(1);
+                }
+            } else {
+                step(&mut self.state, self.config, throttle, steering, [0.0, 0.0]);
+            }
+            self.time += DT;
         }
     }
 }

@@ -1,0 +1,83 @@
+{
+  "version": 2,
+  "id": "training-channel",
+  "name": "Rapidhelm Training Channel",
+  "bounds": {
+    "minX": -10,
+    "maxX": 10,
+    "minZ": 0,
+    "maxZ": 180
+  },
+  "start": {
+    "x": 0,
+    "z": 5,
+    "yaw": 0
+  },
+  "flow": {
+    "speed": 3.2,
+    "startZ": 14,
+    "rampLength": 18
+  },
+  "water": {
+    "waveStartZ": 34,
+    "amplitude": 0.28,
+    "wavelength": 7.5,
+    "frequency": 1.6,
+    "slope": 0.008,
+    "depth": 1.6
+  },
+  "obstacles": [
+    {
+      "id": "rock-1",
+      "x": -4,
+      "z": 43,
+      "radius": 1.4
+    },
+    {
+      "id": "rock-2",
+      "x": 3.5,
+      "z": 55,
+      "radius": 1.2
+    },
+    {
+      "id": "rock-3",
+      "x": -2.5,
+      "z": 89,
+      "radius": 1.5
+    },
+    {
+      "id": "rock-4",
+      "x": 1,
+      "z": 117,
+      "radius": 1.4
+    },
+    {
+      "id": "rock-5",
+      "x": -5,
+      "z": 145,
+      "radius": 1.3
+    }
+  ],
+  "regions": [
+    {
+      "id": "right-eddy",
+      "x": 7,
+      "z": 67,
+      "radiusX": 2.8,
+      "radiusZ": 11,
+      "velocityX": 0,
+      "velocityZ": -2,
+      "swirl": 0.8
+    },
+    {
+      "id": "left-eddy",
+      "x": -7,
+      "z": 105,
+      "radiusX": 2.8,
+      "radiusZ": 9,
+      "velocityX": 0,
+      "velocityZ": -1.7,
+      "swirl": -0.6
+    }
+  ]
+}
